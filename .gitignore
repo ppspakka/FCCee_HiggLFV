@@ -1,0 +1,4 @@
+# ignore samples dir
+samples/
+out_plots_eeZH/
+*.root
