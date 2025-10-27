@@ -106,3 +106,9 @@ You can add a new cut without touching the event loop by implementing a selectio
 Notes:
 - Dependencies between cuts: implement prerequisite checks inside `apply()` (e.g., if your cut needs an electron index from a previous step, return false when it’s missing). We can add an optional startup validator if you want hard errors on mis-ordered configs.
 - Keep `analyze_eeZH.cpp` untouched; it’s a reference implementation only.
+
+
+In summary,
+- Add new selection in selections.cpp,
+Then, add the name linking in: selection_factory.cpp, pipline_config.cpp, selection.h
+- in pipeline.json, add the name that matched with pipeline_config.cpp

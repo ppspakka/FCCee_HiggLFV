@@ -16,6 +16,7 @@ std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
     if (key == "z_to_ll" || key == "z->ll" || key == "z_ll") return std::make_unique<ZToLLSelection>();
     if (key == "h_to_mue" || key == "h->mue" || key == "hmue") return std::make_unique<HToMuESelection>();
     if (key == "met_dphi" || key == "met-dphi" || key == "metdphi") return std::make_unique<METDphiSelection>();
+    if (key == "empty_selection") return std::make_unique<EmptySelection>();
     return nullptr;
 }
 
@@ -138,6 +139,10 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
     vars.push_back({
         "dphi_e_met", "|#Delta#phi(e,MET)|;|#Delta#phi|;Events", 64, 0.0, 3.2,
         [](const Event&, const Meta& m) -> double { return m.dphi_e_met; }
+    });
+    vars.push_back({
+        "dphi_mu_e", "|#Delta#phi(#mu,e)|;|#Delta#phi|;Events", 64, 0.0, 3.2,
+        [](const Event&, const Meta& m) -> double { return m.dphi_mu_e; }
     });
     return vars;
 }

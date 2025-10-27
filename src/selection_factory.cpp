@@ -14,6 +14,8 @@ std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
         return std::make_unique<HToMuESelection>();
     } else if (key == "met_dphi" || key == "met-dphi" || key == "metdphi") {
         return std::make_unique<METDphiSelection>();
+    } else if (key == "empty_selection") {
+        return std::make_unique<EmptySelection>();
     }
     return nullptr;
 }

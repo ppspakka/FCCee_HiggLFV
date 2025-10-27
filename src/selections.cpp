@@ -90,12 +90,22 @@ bool HToMuESelection::apply(const Event& evt, Meta& meta, const Parameters& cfg)
     meta.h_mu = idx_mu;
     meta.h_e = idx_e;
 
+    // precompute dphi_e_met
     if (evt.d->MissingET_size > 0) {
         TLorentzVector v1, v2;
         v1.SetPtEtaPhiM(1.0, 0.0, evt.d->Electron_Phi[idx_e], 0.0);
         v2.SetPtEtaPhiM(1.0, 0.0, evt.d->MissingET_Phi[0], 0.0);
         meta.dphi_e_met = std::abs(v1.DeltaPhi(v2));
     }
+
+    // DeltaPhi(mu, e)
+    if (evt.d->Muon_size > 0 && evt.d->Electron_size > 0) {
+        TLorentzVector vmu, ve;
+        vmu.SetPtEtaPhiM(1.0, 0.0, evt.d->Muon_Phi[idx_mu], 0.0);
+        ve.SetPtEtaPhiM(1.0, 0.0, evt.d->Electron_Phi[idx_e], 0.0);
+        meta.dphi_mu_e = std::abs(vmu.DeltaPhi(ve));
+    }
+
     return true;
 }
 
@@ -115,3 +125,9 @@ bool METDphiSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg
 }
 
 } // namespace hlfv
+
+// test add empty cut
+std::string EmptySelection::name() const { return "EmptySelection"; }
+bool EmptySelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
+    return true;
+}
