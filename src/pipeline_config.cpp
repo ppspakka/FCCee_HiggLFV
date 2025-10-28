@@ -144,6 +144,10 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
         "dphi_mu_e", "|#Delta#phi(#mu,e)|;|#Delta#phi|;Events", 64, 0.0, 3.2,
         [](const Event&, const Meta& m) -> double { return m.dphi_mu_e; }
     });
+    vars.push_back({
+        "m_collinear", "Collinear mass (GeV);M_{collinear} [GeV];Events", 100, 0.0, 200.0,
+        [](const Event&, const Meta& m) -> double { return m.m_collinear; }
+    });
     return vars;
 }
 

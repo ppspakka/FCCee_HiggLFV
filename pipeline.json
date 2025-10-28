@@ -16,7 +16,7 @@
   "selections": [
     { "name": "Z_to_ll",   "enabled": true },
     { "name": "H_to_mue",  "enabled": true },
-    { "name": "empty_selection", "enabled": true },
-    { "name": "MET_dphi",  "enabled": true }
+    { "name": "MET_dphi",  "enabled": true },
+    { "name": "empty_selection", "enabled": false }
   ]
 }

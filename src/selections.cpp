@@ -105,7 +105,19 @@ bool HToMuESelection::apply(const Event& evt, Meta& meta, const Parameters& cfg)
         ve.SetPtEtaPhiM(1.0, 0.0, evt.d->Electron_Phi[idx_e], 0.0);
         meta.dphi_mu_e = std::abs(vmu.DeltaPhi(ve));
     }
-
+    // collinear mass
+    if (evt.d->MissingET_size > 0) {
+        TLorentzVector vmu, ve;
+        vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
+        ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
+        double px_miss = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
+        double py_miss = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
+        double pz_miss = (ve.Pz()/ve.Pt()) * std::sqrt(px_miss*px_miss + py_miss*py_miss);
+        double e_miss = std::sqrt(px_miss*px_miss + py_miss*py_miss + pz_miss*pz_miss);
+        TLorentzVector vmiss;
+        vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
+        meta.m_collinear =  (vmu + ve + vmiss).M();
+    }
     return true;
 }
 
