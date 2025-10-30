@@ -1,5 +1,6 @@
 # ignore samples dir
 samples/
+outdir/
 out_plots_eeZH/
 *.root
 CutPython.py

@@ -109,6 +109,6 @@ Notes:
 
 
 In summary,
-- Add new selection in selections.cpp,
-Then, add the name linking in: selection_factory.cpp, pipline_config.cpp, selection.h
-- in pipeline.json, add the name that matched with pipeline_config.cpp
+- Add new selection in `selections.cpp`,
+Then, add the name linking in: `pipline_config.cpp`, `selection.h`
+- in `pipeline.json`, add the name that matched with pipeline_config.cpp

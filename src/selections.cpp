@@ -143,3 +143,10 @@ std::string EmptySelection::name() const { return "EmptySelection"; }
 bool EmptySelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
     return true;
 }
+
+// Final state: no cut applied
+std::string FinalState_NoCut::name() const { return "FinalState_NoCut"; }
+
+bool FinalState_NoCut::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
+    return true;
+}

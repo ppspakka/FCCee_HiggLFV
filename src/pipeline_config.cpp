@@ -17,6 +17,7 @@ std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
     if (key == "h_to_mue" || key == "h->mue" || key == "hmue") return std::make_unique<HToMuESelection>();
     if (key == "met_dphi" || key == "met-dphi" || key == "metdphi") return std::make_unique<METDphiSelection>();
     if (key == "empty_selection") return std::make_unique<EmptySelection>();
+    if (key == "finalstate_nocut" || key == "final_state_nocut" || key == "finalstate-nocut") return std::make_unique<FinalState_NoCut>();
     return nullptr;
 }
 
@@ -112,9 +113,8 @@ bool loadPipelineConfig(const std::string& filepath, PipelineConfig& out) {
     }
 
     if (cfg.selections.empty()) {
-        cfg.selections.push_back({"Z_to_ll", true});
-        cfg.selections.push_back({"H_to_mue", true});
-        cfg.selections.push_back({"MET_dphi", true});
+        // error: at least one selection
+        return false;
     }
 
     out = cfg;
