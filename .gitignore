@@ -1,4 +1,7 @@
 # ignore samples dir
+datacards/*.txt
+datacards/*.root
+datacards/*.out
 samples/
 outdir/
 out_plots_eeZH/

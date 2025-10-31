@@ -59,12 +59,7 @@ void analyze_pipeline(const char* inputPath = "samples/HMuTauE_LFV_125.root",
     // Load pipeline config (JSON). Fallback to defaults if missing.
     PipelineConfig cfg;
     bool haveCfg = loadPipelineConfig(configPath, cfg);
-    if (!haveCfg) {
-        // Defaults
-        cfg.params = Parameters{};
-        cfg.selections = { {"Z_to_ll", true}, {"H_to_mue", true}, {"MET_dphi", true} };
-    }
-
+    
     // Build active selections from config
     std::vector<std::pair<std::string, std::unique_ptr<ISelection>>> selections;
     selections.reserve(cfg.selections.size());
@@ -93,6 +88,21 @@ void analyze_pipeline(const char* inputPath = "samples/HMuTauE_LFV_125.root",
 
     HistogramManager hman(stepNames, variables);
     Parameters params = cfg.params; // from config or defaults
+
+    // Print all Parameters used (in loop)
+    printf("==== Analysis Parameters ====\n");
+    for (const auto& p : {
+        std::make_pair("z_mass", params.z_mass),
+        std::make_pair("zl_pt_min", params.zl_pt_min),
+        std::make_pair("z_mass_window", params.z_mass_window),
+        std::make_pair("mu_pt_min", params.mu_pt_min),
+        std::make_pair("e_pt_min", params.e_pt_min),
+        std::make_pair("max_dphi_e_met", params.max_dphi_e_met)
+    }) {
+        printf("%-20s : %g\n", p.first, p.second);
+    }
+    printf("=============================\n");
+
 
     // Event loop
     const Long64_t nEntries = chain->GetEntries();
@@ -138,7 +148,7 @@ void analyze_pipeline(const char* inputPath = "samples/HMuTauE_LFV_125.root",
 
     fout->Close();
 
-    printf("\n==== Demo pipeline summary ====\n");
+    printf("\n==== Pipeline summary ====\n");
     printf("Total events:          %lld\n", nEntries);
     for (size_t i = 0; i < cutflow.size(); ++i) {
         printf("After %-16s %lld\n", stepNames[i].c_str(), cutflow[i]);

@@ -7,13 +7,15 @@ class Delphes; // forward declaration
 namespace hlfv {
 
 struct Parameters {
-    double z_mass = 91.1876;     // GeV
-    double z_mass_window = 10.0; // |Mll - MZ| < window (GeV)
-    // H->mue thresholds
-    double mu_pt_min = 30.0;     // GeV
-    double e_pt_min = 20.0;      // GeV
+    // Z->ll parameters
+    double z_mass;
+    double zl_pt_min;
+    double z_mass_window;
+    // H->mue parameters
+    double mu_pt_min;
+    double e_pt_min;
     // MET selection
-    double max_dphi_e_met = 0.7; // selection threshold
+    double max_dphi_e_met;
 };
 
 struct Event {
@@ -30,6 +32,8 @@ struct Meta {
     // H->mu e candidate (not from Z)
     int h_mu = -1;
     int h_e = -1;
+    double h_mu_pt = std::numeric_limits<double>::quiet_NaN();
+    double h_e_pt = std::numeric_limits<double>::quiet_NaN();
     double dphi_e_met = std::numeric_limits<double>::quiet_NaN();
     double dphi_mu_e = std::numeric_limits<double>::quiet_NaN();
     // collinear mass

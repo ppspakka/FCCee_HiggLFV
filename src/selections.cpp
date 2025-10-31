@@ -24,7 +24,9 @@ bool ZToLLSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) 
 
     // electrons
     for (int i = 0; i < evt.d->Electron_size; ++i) {
+        if (evt.d->Electron_PT[i] < cfg.zl_pt_min) continue; // pT cut
         for (int j = i+1; j < evt.d->Electron_size; ++j) {
+            if (evt.d->Electron_PT[j] < cfg.zl_pt_min) continue; // pT cut
             if (evt.d->Electron_Charge[i]*evt.d->Electron_Charge[j] >= 0) continue; // OS
             TLorentzVector l1, l2;
             l1.SetPtEtaPhiM(evt.d->Electron_PT[i], evt.d->Electron_Eta[i], evt.d->Electron_Phi[i], Me);
@@ -89,6 +91,9 @@ bool HToMuESelection::apply(const Event& evt, Meta& meta, const Parameters& cfg)
 
     meta.h_mu = idx_mu;
     meta.h_e = idx_e;
+
+    meta.h_mu_pt = evt.d->Muon_PT[idx_mu];
+    meta.h_e_pt = evt.d->Electron_PT[idx_e];
 
     // precompute dphi_e_met
     if (evt.d->MissingET_size > 0) {

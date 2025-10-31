@@ -70,6 +70,7 @@ bool loadPipelineConfig(const std::string& filepath, PipelineConfig& out) {
             }
         };
         parseParam("z_mass", cfg.params.z_mass);
+        parseParam("zl_pt_min", cfg.params.zl_pt_min);
         parseParam("z_mass_window", cfg.params.z_mass_window);
         parseParam("mu_pt_min", cfg.params.mu_pt_min);
         parseParam("e_pt_min", cfg.params.e_pt_min);
@@ -135,6 +136,14 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
     vars.push_back({
         "z_mass_diff", "|M_{ll}-M_{Z}| (GeV);|M_{ll}-M_{Z}| [GeV];Events", 50, 0.0, 25.0,
         [](const Event&, const Meta& m) -> double { return m.z_mass_diff; }
+    });
+    vars.push_back({
+        "h_mu_pt", "p_{T}(#mu) (GeV);p_{T}(#mu) [GeV];Events", 50, 0.0, 100.0,
+        [](const Event&, const Meta& m) -> double { return m.h_mu_pt; }
+    });
+    vars.push_back({
+        "h_e_pt", "p_{T}(e) (GeV);p_{T}(e) [GeV];Events", 50, 0.0, 100.0,
+        [](const Event&, const Meta& m) -> double { return m.h_e_pt; }
     });
     vars.push_back({
         "dphi_e_met", "|#Delta#phi(e,MET)|;|#Delta#phi|;Events", 64, 0.0, 3.2,

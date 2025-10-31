@@ -112,3 +112,9 @@ In summary,
 - Add new selection in `selections.cpp`,
 Then, add the name linking in: `pipline_config.cpp`, `selection.h`
 - in `pipeline.json`, add the name that matched with pipeline_config.cpp
+
+For adding the new parameter
+- Update `type.h`
+- Update `pipline.json`
+- Update `pipline_config.cpp` to parse new parameter
+- print in `analyze_pipeline.cpp` for debugging

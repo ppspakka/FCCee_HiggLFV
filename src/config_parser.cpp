@@ -52,9 +52,6 @@ bool loadPipelineConfig(const std::string& filepath, PipelineConfig& out) {
                 }
             }
         };
-        // parseParam("z_mass", cfg.params.z_mass);
-        // parseParam("z_mass_window", cfg.params.z_mass_window);
-        // parseParam("max_dphi_e_met", cfg.params.max_dphi_e_met);
     }
 
     // Parse selections array
