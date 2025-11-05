@@ -155,3 +155,214 @@ std::string FinalState_NoCut::name() const { return "FinalState_NoCut"; }
 bool FinalState_NoCut::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
     return true;
 }
+
+// Prepare for the H->etau analysis
+/*
+    I) Lepton selections:
+        1) Filter all leptons (e, mu) with pT > threshold (eg. 10 GeV)
+        2) Require either
+        - 1 muon + 3 electrons or 1 electron + 3 muons
+        3) Conservative of charge requirement: net charge = 0
+    Meta info to store:
+        - l1flavor (0=e,1=mu) -> To store prompt lepton from H decay
+        - l2flavor (0=e,1=mu)
+        - l3flavor (0=e,1=mu)
+        - l4flavor (0=e,1=mu)
+        - l1 index
+        - l2 index
+        - l3 index
+        - l4 index
+*/
+
+std::string LeptonSelection::name() const { return "LeptonSelection"; }
+bool LeptonSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
+    if (!evt.d) return false;
+    // store selected leptons
+    struct Lepton {
+        int index;
+        int flavor; // 0=e,1=mu
+        double pt;
+        int charge;
+    };
+    std::vector<Lepton> selected_muons;
+    std::vector<Lepton> selected_electrons;
+
+    // select electrons
+    for (int i = 0; i < evt.d->Electron_size; ++i) {
+        if (evt.d->Electron_PT[i] > cfg.lepton_pt_min) {
+            selected_electrons.push_back(Lepton{i, 0, evt.d->Electron_PT[i], evt.d->Electron_Charge[i]});
+        }
+    }
+
+    // select muons
+    for (int i = 0; i < evt.d->Muon_size; ++i) {
+        if (evt.d->Muon_PT[i] > cfg.lepton_pt_min) {
+            selected_muons.push_back(Lepton{i, 1, evt.d->Muon_PT[i], evt.d->Muon_Charge[i]});
+        }
+    }
+
+    // check for 1 mu + 3 e or 1 e + 3 mu
+    if (!((selected_muons.size() == 1 && selected_electrons.size() == 3) ||
+          (selected_muons.size() == 3 && selected_electrons.size() == 1))) {
+        return false;
+    }
+    // check net charge = 0
+    int net_charge = 0;
+    for (const auto& mu : selected_muons) {
+        net_charge += mu.charge;
+    }
+    for (const auto& ele : selected_electrons) {
+        net_charge += ele.charge;
+    }
+    if (net_charge != 0) return false;
+
+    // store in meta (1st lepton = prompt lepton from H decay, or lepton with only one copy)
+    // if comb: 1 mu + 3 e, 1st = muon, else 1st = electron
+    
+    if (selected_muons.size() == 1) {
+        // 1 mu + 3 e
+        meta.l1flavor = 1;
+        meta.l1_index = selected_muons[0].index;
+        // sort electrons by pT descending
+        std::sort(selected_electrons.begin(), selected_electrons.end(),
+                  [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
+        meta.l2flavor = 0; meta.l2_index = selected_electrons[0].index;
+        meta.l3flavor = 0; meta.l3_index = selected_electrons[1].index;
+        meta.l4flavor = 0; meta.l4_index = selected_electrons[2].index;
+    } else {
+        // 1 e + 3 mu
+        meta.l1flavor = 0;
+        meta.l1_index = selected_electrons[0].index;
+        // sort muons by pT descending
+        std::sort(selected_muons.begin(), selected_muons.end(),
+                  [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
+        meta.l2flavor = 1; meta.l2_index = selected_muons[0].index;
+        meta.l3flavor = 1; meta.l3_index = selected_muons[1].index;
+        meta.l4flavor = 1; meta.l4_index = selected_muons[2].index;
+    }
+    return true;
+}
+
+/*
+    II) Z candidate selection:
+        1) Identify flavor of Z candidate (ee or mumu) from the selected leptons
+        - if 1 muon + 3 electrons: Z->ee
+        - if 1 electron + 3 muons: Z->mumu
+        2) from 3 leptons:
+            - select one that have same sign as the prompt lepton from H decay -> first lepton candidate
+        3) Loop based on the Z from 2)
+            - check OS for the two leptons from Z
+            - compute invariant mass
+            - check mass window
+    Meta info to store:
+        - z_l1 index
+        - z_l2 index
+        - z_flavor (0=e,1=mu)
+        - z_mass
+        - z_mass_diff
+*/
+
+std::string ZCandidateSelection::name() const { return "ZCandidateSelection"; }
+bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
+    if (!evt.d) return false;
+    // determine Z flavor
+    int z_flav = -1; // 0=e,1=mu
+    if (meta.l1flavor == 1 && meta.l2flavor == 0 && meta.l3flavor == 0 && meta.l4flavor == 0) {
+        z_flav = 0; // Z->ee
+    } else if (meta.l1flavor == 0 && meta.l2flavor == 1 && meta.l3flavor == 1 && meta.l4flavor == 1) {
+        z_flav = 1; // Z->mumu
+    } else {
+        return false; // invalid flavor combination
+    }
+    // identify first lepton candidate from Z
+    int first_z_lep_index = -1;
+    // get charge of prompt lepton from H decay
+    int prompt_lep_charge = 0;
+    if (meta.l1flavor == 0) {
+        prompt_lep_charge = evt.d->Electron_Charge[meta.l1_index];
+    } else if (meta.l1flavor == 1) {
+        prompt_lep_charge = evt.d->Muon_Charge[meta.l1_index];
+    }
+    // identify first lepton candidate from Z (same sign as prompt lepton)
+    if (z_flav == 0) {
+        // Z->ee
+        for (int i = 2; i <=4; ++i) {
+            int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
+            if (evt.d->Electron_Charge[idx] == prompt_lep_charge) {
+                first_z_lep_index = idx;
+                break;
+            }
+        }
+    } else if (z_flav == 1) {
+        // Z->mumu
+        for (int i = 2; i <=4; ++i) {
+            int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
+            if (evt.d->Muon_Charge[idx] == prompt_lep_charge) {
+                first_z_lep_index = idx;
+                break;
+            }
+        }
+    }
+    if (first_z_lep_index == -1) return false; // could not find
+    
+    int second_z_lep_index = -1;
+    double bestDiff = 1e9;
+    double bestMass = std::numeric_limits<double>::quiet_NaN();
+    if (z_flav == 0) {
+        // Z->ee
+        for (int i = 2; i <=4; ++i) {
+            int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
+            if (idx == first_z_lep_index) continue;
+            // check OS
+            if (evt.d->Electron_Charge[first_z_lep_index] * evt.d->Electron_Charge[idx] >= 0) continue;
+            // compute invariant mass
+            TLorentzVector l1, l2;
+            l1.SetPtEtaPhiM(evt.d->Electron_PT[first_z_lep_index], evt.d->Electron_Eta[first_z_lep_index],
+                            evt.d->Electron_Phi[first_z_lep_index], Me);
+            l2.SetPtEtaPhiM(evt.d->Electron_PT[idx], evt.d->Electron_Eta[idx],
+                            evt.d->Electron_Phi[idx], Me);
+            double mass = (l1 + l2).M();
+            double diff = std::abs(mass - cfg.z_mass);
+            if (diff < cfg.z_mass_window) {
+                if (diff < bestDiff) {
+                    bestDiff = diff;
+                    bestMass = mass;
+                    second_z_lep_index = idx;
+                }
+            }
+        }
+    }
+    if (z_flav == 1) {
+        // Z->mumu
+        for (int i = 2; i <=4; ++i) {
+            int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
+            if (idx == first_z_lep_index) continue;
+            // check OS
+            if (evt.d->Muon_Charge[first_z_lep_index] * evt.d->Muon_Charge[idx] >= 0) continue;
+            // compute invariant mass
+            TLorentzVector l1, l2;
+            l1.SetPtEtaPhiM(evt.d->Muon_PT[first_z_lep_index], evt.d->Muon_Eta[first_z_lep_index],
+                            evt.d->Muon_Phi[first_z_lep_index], Mmu);
+            l2.SetPtEtaPhiM(evt.d->Muon_PT[idx], evt.d->Muon_Eta[idx],
+                            evt.d->Muon_Phi[idx], Mmu);
+            double mass = (l1 + l2).M();
+            double diff = std::abs(mass - cfg.z_mass);
+            if (diff < cfg.z_mass_window) {
+                if (diff < bestDiff) {
+                    bestDiff = diff;
+                    bestMass = mass;
+                    second_z_lep_index = idx;
+                }
+            }
+        }   
+    }
+    if (second_z_lep_index != -1) {
+        meta.z_l1 = first_z_lep_index;
+        meta.z_l2 = second_z_lep_index;
+        meta.z_flavor = z_flav;
+        meta.z_mass = bestMass;
+        meta.z_mass_diff = bestDiff;
+        return true;
+    }
+    return false;
+}

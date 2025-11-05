@@ -38,6 +38,7 @@ def run_combine(datacard: Path, quantile: str):
         "--expectedFromGrid", str(quantile),
         "--saveToys",
         "-T", "5000",
+        "--fork", "25",
         "--setParameters", f"lumiscale={LUMI}",
     ]
     try:
@@ -67,6 +68,8 @@ def main():
             limit, log, code = run_combine(f, q)
             if limit is None:
                 print(f"Warning: no limit parsed for {f.name} @ {q}. Return code={code}")
+            else:
+                print(f"  -> limit r < {limit}")
             all_files[key][q] = limit
 
     with open(OUTPUT_JSON, "w") as fp:

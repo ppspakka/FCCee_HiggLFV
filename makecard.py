@@ -151,12 +151,20 @@ def write_merged_root(
     for proc, hist in proc_to_hist.items():
         hwrite = hist.Clone(proc)
         hwrite.SetDirectory(ch_dir)
+        
+        # for ibin in range(1, hwrite.GetNbinsX() + 1):
+        #     hwrite.SetBinError(ibin, 0.0)
+        
         hwrite.Write()
 
     # Write data_obs if provided (sum of all backgrounds)
     if data_obs_hist is not None:
         dobj = data_obs_hist.Clone("data_obs")
         dobj.SetDirectory(ch_dir)
+        
+        # for ibin in range(1, dobj.GetNbinsX() + 1):
+        #     dobj.SetBinError(ibin, 0.0)
+        
         dobj.Write()
 
     f.Write()

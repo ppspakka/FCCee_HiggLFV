@@ -18,6 +18,8 @@ std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
     if (key == "met_dphi" || key == "met-dphi" || key == "metdphi") return std::make_unique<METDphiSelection>();
     if (key == "empty_selection") return std::make_unique<EmptySelection>();
     if (key == "finalstate_nocut" || key == "final_state_nocut" || key == "finalstate-nocut") return std::make_unique<FinalState_NoCut>();
+    if (key == "lepton_selection" || key == "leptonselection") return std::make_unique<LeptonSelection>();
+    if (key == "z_candidate_selection" || key == "zcandidate_selection") return std::make_unique<ZCandidateSelection>();
     return nullptr;
 }
 
@@ -69,6 +71,7 @@ bool loadPipelineConfig(const std::string& filepath, PipelineConfig& out) {
                 }
             }
         };
+        parseParam("lepton_pt_min", cfg.params.lepton_pt_min);
         parseParam("z_mass", cfg.params.z_mass);
         parseParam("zl_pt_min", cfg.params.zl_pt_min);
         parseParam("z_mass_window", cfg.params.z_mass_window);

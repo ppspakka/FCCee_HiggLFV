@@ -7,6 +7,8 @@ class Delphes; // forward declaration
 namespace hlfv {
 
 struct Parameters {
+    // Lepton selection
+    double lepton_pt_min;
     // Z->ll parameters
     double z_mass;
     double zl_pt_min;
@@ -23,6 +25,16 @@ struct Event {
 };
 
 struct Meta {
+    // Lepton selection info (unset -> NaN / -1)
+    int l1flavor = -1; // 0=e,1=mu
+    int l2flavor = -1;
+    int l3flavor = -1;
+    int l4flavor = -1;
+    int l1_index = -1;
+    int l2_index = -1;
+    int l3_index = -1;
+    int l4_index = -1;
+
     // Z candidate info (unset -> NaN / -1)
     int z_l1 = -1;
     int z_l2 = -1;
