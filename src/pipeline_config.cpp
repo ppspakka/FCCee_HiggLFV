@@ -13,13 +13,25 @@ namespace hlfv {
 std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
     std::string key = name;
     std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c){ return std::tolower(c); });
-    if (key == "z_to_ll" || key == "z->ll" || key == "z_ll") return std::make_unique<ZToLLSelection>();
-    if (key == "h_to_mue" || key == "h->mue" || key == "hmue") return std::make_unique<HToMuESelection>();
-    if (key == "met_dphi" || key == "met-dphi" || key == "metdphi") return std::make_unique<METDphiSelection>();
+
     if (key == "empty_selection") return std::make_unique<EmptySelection>();
+
     if (key == "finalstate_nocut" || key == "final_state_nocut" || key == "finalstate-nocut") return std::make_unique<FinalState_NoCut>();
+
     if (key == "lepton_selection" || key == "leptonselection") return std::make_unique<LeptonSelection>();
+
     if (key == "z_candidate_selection" || key == "zcandidate_selection") return std::make_unique<ZCandidateSelection>();
+
+    if (key == "z_to_ll" || key == "z->ll" || key == "z_ll") return std::make_unique<ZToLLSelection>();
+
+    // H to mu tau_e
+    if (key == "h_to_mutau_e" || key == "h_to_mutaue" || key == "h_to_mue" || key == "h->mutau_e") return std::make_unique<HToMuTauESelection>();
+
+    if (key == "h_to_etau_mu") return std::make_unique<HToETauMuSelection>();
+    
+    // if (key == "met_dphi" || key == "met-dphi" || key == "metdphi") return std::make_unique<METDphiSelection>();
+    if (key == "met_e_dphi" || key == "metedphi" || key == "met_e-dphi") return std::make_unique<METEDphiSelection>();
+    if (key == "met_mu_dphi" || key == "metmudphi" || key == "met_mu-dphi") return std::make_unique<METMuDphiSelection>();
     return nullptr;
 }
 
@@ -78,6 +90,7 @@ bool loadPipelineConfig(const std::string& filepath, PipelineConfig& out) {
         parseParam("mu_pt_min", cfg.params.mu_pt_min);
         parseParam("e_pt_min", cfg.params.e_pt_min);
         parseParam("max_dphi_e_met", cfg.params.max_dphi_e_met);
+        parseParam("max_dphi_mu_met", cfg.params.max_dphi_mu_met);
     }
 
     // selections array
@@ -151,6 +164,10 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
     vars.push_back({
         "dphi_e_met", "|#Delta#phi(e,MET)|;|#Delta#phi|;Events", 64, 0.0, 3.2,
         [](const Event&, const Meta& m) -> double { return m.dphi_e_met; }
+    });
+    vars.push_back({
+        "dphi_mu_met", "|#Delta#phi(#mu,MET)|;|#Delta#phi|;Events", 64, 0.0, 3.2,
+        [](const Event&, const Meta& m) -> double { return m.dphi_mu_met; }
     });
     vars.push_back({
         "dphi_mu_e", "|#Delta#phi(#mu,e)|;|#Delta#phi|;Events", 64, 0.0, 3.2,

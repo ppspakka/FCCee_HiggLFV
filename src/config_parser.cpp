@@ -97,9 +97,7 @@ bool loadPipelineConfig(const std::string& filepath, PipelineConfig& out) {
     }
 
     if (cfg.selections.empty()) {
-        cfg.selections.push_back({"Z_to_ll", true});
-        cfg.selections.push_back({"H_to_mue", true});
-        cfg.selections.push_back({"MET_dphi", true});
+        return false;
     }
 
     out = cfg;

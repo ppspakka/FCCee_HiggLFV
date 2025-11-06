@@ -21,7 +21,7 @@ struct PipelineConfig {
 // Parse JSON-like config file with keys: parameters{...}, selections[{ name, enabled }]
 bool loadPipelineConfig(const std::string& filepath, PipelineConfig& out);
 
-// Instantiate selection object from a name (e.g., "Z_to_ll", "H_to_mue", "MET_dphi")
+// Instantiate selection object from a name
 std::unique_ptr<ISelection> makeSelectionByName(const std::string& name);
 
 // Variables registry

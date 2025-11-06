@@ -25,12 +25,9 @@
     { "name": "Z_to_ll",                "enabled": false },
 
     { "name": "H_to_mutau_e",           "enabled": true },
-    { "name": "H_to_etau_mu",           "enabled": false },
 
     { "name": "MET_e_dphi",               "enabled": true },
-    { "name": "MET_mu_dphi",              "enabled": false },
 
-    { "name": "finalstate_nocut",       "enabled": true },
-    { "name": "empty_selection",        "enabled": false }
+    { "name": "finalstate_nocut",       "enabled": true }
   ]
 }

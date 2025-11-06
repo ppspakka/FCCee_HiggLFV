@@ -18,6 +18,7 @@ struct Parameters {
     double e_pt_min;
     // MET selection
     double max_dphi_e_met;
+    double max_dphi_mu_met;
 };
 
 struct Event {
@@ -41,12 +42,13 @@ struct Meta {
     int z_flavor = -1; // 0=e, 1=mu
     double z_mass = std::numeric_limits<double>::quiet_NaN();
     double z_mass_diff = std::numeric_limits<double>::quiet_NaN();
-    // H->mu e candidate (not from Z)
+    // H->mu tau_e or H->e tau_mu candidate info
     int h_mu = -1;
     int h_e = -1;
     double h_mu_pt = std::numeric_limits<double>::quiet_NaN();
     double h_e_pt = std::numeric_limits<double>::quiet_NaN();
     double dphi_e_met = std::numeric_limits<double>::quiet_NaN();
+    double dphi_mu_met = std::numeric_limits<double>::quiet_NaN();
     double dphi_mu_e = std::numeric_limits<double>::quiet_NaN();
     // collinear mass
     double m_collinear = std::numeric_limits<double>::quiet_NaN();
