@@ -24,6 +24,8 @@ DEFAULT_FINAL_HIST_REGEX = r"^\d+_finalstate_nocut_m_collinear$"
 
 # Cross-sections in pb
 cross_sections_pb = {
+    # --- Signals ---
+    # H->MuTauE with 1 ab^-1 -> 1 event
     'HMuTauE_LFV_110': 1 / 1e6,  # 1 ab -> 1 event
     'HMuTauE_LFV_115': 1 / 1e6,
     'HMuTauE_LFV_120': 1 / 1e6,
@@ -35,6 +37,21 @@ cross_sections_pb = {
     'HMuTauE_LFV_150': 1 / 1e6,
     'HMuTauE_LFV_155': 1 / 1e6,
     'HMuTauE_LFV_160': 1 / 1e6,
+    
+    # H->ETauMu with 1 ab^-1 -> 1 event
+    'HETauMu_LFV_110': 1 / 1e6,  # 1 ab -> 1 event
+    'HETauMu_LFV_115': 1 / 1e6,
+    'HETauMu_LFV_120': 1 / 1e6,
+    'HETauMu_LFV_125': 1 / 1e6,  # 1 ab -> 1 event
+    'HETauMu_LFV_130': 1 / 1e6,
+    'HETauMu_LFV_135': 1 / 1e6,
+    'HETauMu_LFV_140': 1 / 1e6,
+    'HETauMu_LFV_145': 1 / 1e6,
+    'HETauMu_LFV_150': 1 / 1e6,
+    'HETauMu_LFV_155': 1 / 1e6,
+    'HETauMu_LFV_160': 1 / 1e6,
+    
+    # --- Backgrounds ---
     'ZWW': 2.79708716e-06,       # Z->ll, W->lvlv
     'HZFourLepton': 2.714e-06,   # Z->ll, H->WW, WW->lvlv
 }
