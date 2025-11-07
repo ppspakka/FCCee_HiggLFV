@@ -9,12 +9,27 @@ A modular analysis pipeline is provided in `analyze_pipeline.cpp`. It builds a s
 - 02_H_to_mue_<var>
 - 03_MET_dphi_<var>
 
-Current variables booked per cut:
+Current 1D variables booked per cut (see `Variables::getDefault()` in `src/pipeline_config.cpp`):
 
 - n_muons
 - z_mass
 - z_mass_diff
+- h_mu_pt
+- h_e_pt
 - dphi_e_met
+- dphi_mu_met
+- dphi_mu_e
+- m_collinear
+- m_z1
+- m_z2
+- m_h1
+- m_h2
+
+Current 2D correlation histograms (see `Variables::getDefault2D()`):
+
+- mZ_vs_mH1 (M_{Z1} vs M_{H1})
+- mZ2_vs_mH2 (M_{Z2} vs M_{H2})
+- pt_mu_vs_pt_e (pT(mu) vs pT(e))
 
 ### How to run
 
@@ -95,8 +110,10 @@ You can add a new cut without touching the event loop by implementing a selectio
      - Reorder or toggle cuts by editing this list. No code changes required.
 
 6) Optional: add new variables (plots)
-   - File: `analyze_pipeline.cpp`
-     - In the `variables` list, add a `VarSpec` with a compute lambda. Return NaN when the value isn’t valid yet; the histogram filler will skip it.
+   - File: `src/pipeline_config.cpp`
+     - In `Variables::getDefault()` add a `HistogramManager::VarSpec` entry.
+     - For 2D plots add entries to `Variables::getDefault2D()` using `HistogramManager::Var2DSpec` with separate lambdas for X and Y.
+   - Returning NaN for either axis will skip filling.
 
 7) Optional: add new parameters
    - File: `include/types.h` (add to `Parameters`)

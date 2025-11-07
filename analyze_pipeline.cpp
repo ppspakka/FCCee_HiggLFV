@@ -83,10 +83,11 @@ void analyze_pipeline(const char* inputPath = "samples/HMuTauE_LFV_125.root",
         stepNames.emplace_back(buf);
     }
 
-    // Variables registry
+    // Variables registry (1D & 2D)
     std::vector<HistogramManager::VarSpec> variables = Variables::getDefault();
+    std::vector<HistogramManager::Var2DSpec> variables2D = Variables::getDefault2D();
 
-    HistogramManager hman(stepNames, variables);
+    HistogramManager hman(stepNames, variables, variables2D);
     Parameters params = cfg.params; // from config or defaults
 
     // Print all Parameters used (in loop)

@@ -52,6 +52,15 @@ struct Meta {
     double dphi_mu_e = std::numeric_limits<double>::quiet_NaN();
     // collinear mass
     double m_collinear = std::numeric_limits<double>::quiet_NaN();
+
+    // m_Z candidate case 1 (closest pair)
+    double m_z1 = std::numeric_limits<double>::quiet_NaN();
+    // m_Z candidate case 2 (second pair)
+    double m_z2 = std::numeric_limits<double>::quiet_NaN();
+    // m_h case 1 (choose Z closest pair)
+    double m_h1 = std::numeric_limits<double>::quiet_NaN();
+    // m_h case 2 choose Z second pair, remaining used to calculate col mass
+    double m_h2 = std::numeric_limits<double>::quiet_NaN();
 };
 
 } // namespace hlfv

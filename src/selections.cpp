@@ -19,7 +19,7 @@ namespace {
     }
 
     // compute collinear mass for mu + e using missing ET (returns NaN if no MissingET)
-    static double computeCollinearMass(const Event& evt, int idx_mu, int idx_e) {
+    static double computeCollinearMassMuTauE(const Event& evt, int idx_mu, int idx_e) {
         if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
         TLorentzVector vmu, ve;
         vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
@@ -27,6 +27,19 @@ namespace {
         double px_miss = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
         double py_miss = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
         double pz_miss = (ve.Pz()/ve.Pt()) * std::sqrt(px_miss*px_miss + py_miss*py_miss);
+        double e_miss = std::sqrt(px_miss*px_miss + py_miss*py_miss + pz_miss*pz_miss);
+        TLorentzVector vmiss;
+        vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
+        return (vmu + ve + vmiss).M();
+    }
+    static double computeCollinearMassETauMu(const Event& evt, int idx_e, int idx_mu) {
+        if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
+        TLorentzVector ve, vmu;
+        ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
+        vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
+        double px_miss = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
+        double py_miss = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
+        double pz_miss = (vmu.Pz()/vmu.Pt()) * std::sqrt(px_miss*px_miss + py_miss*py_miss);
         double e_miss = std::sqrt(px_miss*px_miss + py_miss*py_miss + pz_miss*pz_miss);
         TLorentzVector vmiss;
         vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
@@ -300,7 +313,51 @@ bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
         meta.z_flavor = z_flav;
         meta.z_mass = bestMass;
         meta.z_mass_diff = bestDiff;
+        // return true;
+    
+    
+        // Calculate the invariant mass of Z case 1 (use best pair)
+        meta.m_z1 = meta.z_mass;
+        // Calculate the invariant mass of Z case 2 (use 1st z candidate + second best lepton)
+        // e.g., e1 (z 1st cand), e2 (z best pair), e3 (remaining) -> use e1 + e3 to calculate m_z2
+        int remaining_lep_index = -1;
+        if (z_flav == 0) {
+            // Z->ee
+            for (int i = 2; i <=4; ++i) {
+                int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
+                if (idx != meta.z_l1 && idx != meta.z_l2) {
+                    remaining_lep_index = idx;
+                    break;
+                }
+            }
+            if (remaining_lep_index != -1) {
+                TLorentzVector l1, l2;
+                l1.SetPtEtaPhiM(evt.d->Electron_PT[meta.z_l1], evt.d->Electron_Eta[meta.z_l1],
+                                evt.d->Electron_Phi[meta.z_l1], Me);
+                l2.SetPtEtaPhiM(evt.d->Electron_PT[remaining_lep_index], evt.d->Electron_Eta[remaining_lep_index],
+                                evt.d->Electron_Phi[remaining_lep_index], Me);
+                meta.m_z2 = (l1 + l2).M();
+            }
+        } else if (z_flav == 1) {
+            // Z->mumu
+            for (int i = 2; i <=4; ++i) {
+                int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
+                if (idx != meta.z_l1 && idx != meta.z_l2) {
+                    remaining_lep_index = idx;
+                    break;
+                }
+            }
+            if (remaining_lep_index != -1) {
+                TLorentzVector l1, l2;
+                l1.SetPtEtaPhiM(evt.d->Muon_PT[meta.z_l1], evt.d->Muon_Eta[meta.z_l1],
+                                evt.d->Muon_Phi[meta.z_l1], Mmu);
+                l2.SetPtEtaPhiM(evt.d->Muon_PT[remaining_lep_index], evt.d->Muon_Eta[remaining_lep_index],
+                                evt.d->Muon_Phi[remaining_lep_index], Mmu);
+                meta.m_z2 = (l1 + l2).M();
+            }
+        }
         return true;
+
     } // TODO: Should we require ONLY one valid Z candidate? (within mass window, if multiple combinations found -> reject)
     return false;
 }
@@ -353,8 +410,22 @@ bool HToMuTauESelection::apply(const Event& evt, Meta& meta, const Parameters& c
     }
     // collinear mass
     if (evt.d->MissingET_size > 0) {
-        meta.m_collinear = computeCollinearMass(evt, idx_mu, idx_e);
+        meta.m_collinear = computeCollinearMassMuTauE(evt, idx_mu, idx_e);
     }
+
+    // calculate collinear mass in 2 scenarios
+    // Scenario 1: consider Z candidate with closest mass to m_Z a Z's leptons-> same as above
+    meta.m_h1 = meta.m_collinear;
+    // Scenario 2: consider second best Z candidate's leptons as Z's leptons -> causing the H collinear mass to be
+    // calculated using the remaining leptons (h_mu, zl2, MET) or m_h2 = collinear mass of system (h_mu, zl2, MET)
+    if (meta.z_flavor == 0) {
+        // Z->ee, remaining lepton is muon
+        meta.m_h2 = computeCollinearMassMuTauE(evt, idx_mu, zl2);
+    } else if (meta.z_flavor == 1) {
+        // Z->mumu, remaining lepton is electron
+        meta.m_h2 = computeCollinearMassMuTauE(evt, zl2, idx_e);
+    }
+    
     return true;
 }
 
@@ -408,7 +479,7 @@ bool HToETauMuSelection::apply(const Event& evt, Meta& meta, const Parameters& c
     }
     // collinear mass
     if (evt.d->MissingET_size > 0) {
-        meta.m_collinear = computeCollinearMass(evt, idx_tau_mu, idx_e);
+        meta.m_collinear = computeCollinearMassETauMu(evt, idx_tau_mu, idx_e);
     }
     return true;
 }

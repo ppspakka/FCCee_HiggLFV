@@ -172,6 +172,7 @@ def write_merged_root(
         # for ibin in range(1, hwrite.GetNbinsX() + 1):
         #     hwrite.SetBinError(ibin, 0.0)
         
+        
         hwrite.Write()
 
     # Write data_obs if provided (sum of all backgrounds)
@@ -201,6 +202,24 @@ def maybe_rebin_variable(hist: ROOT.TH1, bin_edges: Optional[List[float]]) -> RO
     rebinned = hist.Rebin(len(edges) - 1, hist.GetName() + "_rebin", edges)
     return rebinned
 
+def get_yield_around_mass(hist: ROOT.TH1, mass: float, window: float) -> float:
+    """
+    For counting experiment
+    sum bin contents in [mass - window, mass + window]
+    """
+    yield_sum = 0.0
+    # for ibin in range(1, hist.GetNbinsX() + 1):
+    #     bin_center = hist.GetBinCenter(ibin)
+    #     if mass - window <= bin_center <= mass + window:
+    #         yield_sum += hist.GetBinContent(ibin)
+    # No attribute GetNbinsX() error fix
+    nbins = hist.GetXaxis().GetNbins()
+    for ibin in range(1, nbins + 1):
+        bin_center = hist.GetBinCenter(ibin)
+        if mass - window <= bin_center <= mass + window:
+            yield_sum += hist.GetBinContent(ibin)
+    return yield_sum
+
 def write_datacard_for_signal(
     signal_proc: str,
     bkg_procs: List[str],
@@ -210,7 +229,8 @@ def write_datacard_for_signal(
     global_unc: Dict[str, float],
     bkg_unc_name: str,
     bkg_unc_value: float,
-    observation: int = 0
+    observation: int = 0,
+    mode: str = "counting", # shape or counting
 ):
     ensure_dir(out_dir)
 
@@ -254,39 +274,103 @@ def write_datacard_for_signal(
     file_path = shapes_root_path.split('/')[-1]
     shapes_root_path = f"{file_path}"
     
-    
-    with open(card_path, "w") as dc:
-        dc.write("imax 1 number of channels\n")
-        dc.write("jmax * number of backgrounds\n")
-        dc.write("kmax * number of nuisance parameters (sources of systematical uncertainties)\n")
-        dc.write("------------\n")
-        dc.write(f"shapes data_obs {channel} {shapes_root_path} {channel}/data_obs\n")
-        dc.write(f"shapes *        {channel} {shapes_root_path} {channel}/$PROCESS\n")
-        dc.write("------------\n")
-        dc.write(f"bin {channel}\n")
-        dc.write(f"observation {observation}\n")
-        dc.write("------------\n")
+    if mode == "shape":
+        with open(card_path, "w") as dc:
+            dc.write("imax 1 number of channels\n")
+            dc.write("jmax * number of backgrounds\n")
+            dc.write("kmax * number of nuisance parameters (sources of systematical uncertainties)\n")
+            dc.write("------------\n")
+            dc.write(f"shapes data_obs {channel} {shapes_root_path} {channel}/data_obs\n")
+            dc.write(f"shapes *        {channel} {shapes_root_path} {channel}/$PROCESS\n")
+            dc.write("------------\n")
+            dc.write(f"bin {channel}\n")
+            dc.write(f"observation {observation}\n")
+            dc.write("------------\n")
 
-        # bin line for each process
-        dc.write(fmt_row(["bin"] + [channel] * nprocs, widths) + "\n")
-        # process names
-        dc.write(fmt_row(["process"] + procs, widths) + "\n")
-        # process ids
-        dc.write(fmt_row(["process"] + [str(i) for i in proc_ids], widths) + "\n")
-        # rates from shapes
-        dc.write(fmt_row(["rate"] + ["-1"] * nprocs, widths) + "\n")
-        dc.write("------------\n")
+            # bin line for each process
+            dc.write(fmt_row(["bin"] + [channel] * nprocs, widths) + "\n")
+            # process names
+            dc.write(fmt_row(["process"] + procs, widths) + "\n")
+            # process ids
+            dc.write(fmt_row(["process"] + [str(i) for i in proc_ids], widths) + "\n")
+            # rates from shapes
+            dc.write(fmt_row(["rate"] + ["-1"] * nprocs, widths) + "\n")
+            dc.write("------------\n")
 
-        # Uncertainties
-        for parts in global_unc_lines:
-            dc.write(fmt_row(parts) + "\n")
-        dc.write(fmt_row(bkg_unc_line) + "\n")
-        dc.write("\n")
+            # Uncertainties
+            for parts in global_unc_lines:
+                dc.write(fmt_row(parts) + "\n")
+            dc.write(fmt_row(bkg_unc_line) + "\n")
+            dc.write("\n")
 
-        # autoMCStats and rateParam/freeze
-        # dc.write("autoMCStats 1\n")
-        dc.write("lumiscale rateParam     *           *           1.0\n")
-        dc.write("nuisance edit freeze lumiscale\n")
+            # autoMCStats and rateParam/freeze
+            # dc.write("autoMCStats 1\n")
+            dc.write("lumiscale rateParam     *           *           1.0\n")
+            dc.write("nuisance edit freeze lumiscale\n")
+    elif mode == "counting":
+        realfile_path = os.path.join(out_dir, file_path)
+        
+        signal_hist = None
+        file = ROOT.TFile.Open(realfile_path)
+        bin1_dir = file.Get(channel)
+        for key in bin1_dir.GetListOfKeys():
+            if key.GetName() == signal_proc:
+                signal_hist = bin1_dir.Get(key.GetName())
+            
+        signal_yield = get_yield_around_mass(
+            signal_hist,
+            mass=float(signal_proc.split('_')[-1]),
+            window=10.0,
+        )
+        
+        background_hist = {}
+        for key in bin1_dir.GetListOfKeys():
+            bkg_name = key.GetName()
+            if bkg_name in bkg_procs:
+                background_hist[bkg_name] = bin1_dir.Get(bkg_name)
+        bkg_yields = []
+        for bkg in bkg_procs:
+            byield = get_yield_around_mass(
+                background_hist[bkg],
+                mass=float(signal_proc.split('_')[-1]),
+                window=10.0,
+            )
+            if byield == 0.0:
+                warn(f"Background '{bkg}' has zero yield around mass for datacard {signal_proc} set to 1e-12 to avoid issues.")
+                byield = 1e-12
+            bkg_yields.append(byield)
+        # Print all yields
+        info(f"Yields for datacard {signal_proc}: signal={signal_yield:.6g}, backgrounds={[f'{by:.6g}' for by in bkg_yields]}")
+        with open(card_path, "w") as dc:
+            dc.write("imax 1 number of channels\n")
+            dc.write("jmax * number of backgrounds\n")
+            dc.write("kmax * number of nuisance parameters (sources of systematical uncertainties)\n")
+            dc.write("------------\n")
+            dc.write(f"bin {channel}\n")
+            dc.write(f"observation {observation}\n")
+            dc.write("------------\n")
+
+            # bin line for each process
+            dc.write(fmt_row(["bin"] + [channel] * nprocs, widths) + "\n")
+            # process names
+            dc.write(fmt_row(["process"] + procs, widths) + "\n")
+            # process ids
+            dc.write(fmt_row(["process"] + [str(i) for i in proc_ids], widths) + "\n")
+            # rates from counting
+            rate_strs = [f"{signal_yield:.6g}"] + [f"{by:.6g}" for by in bkg_yields]
+            dc.write(fmt_row(["rate"] + rate_strs, widths) + "\n")
+            dc.write("------------\n")
+
+            # Uncertainties
+            for parts in global_unc_lines:
+                dc.write(fmt_row(parts) + "\n")
+            dc.write(fmt_row(bkg_unc_line) + "\n")
+            dc.write("\n")
+
+            # autoMCStats and rateParam/freeze
+            # dc.write("autoMCStats 1\n")
+            dc.write("lumiscale rateParam     *           *           1.0\n")
+            dc.write("nuisance edit freeze lumiscale\n")
     info(f"Wrote datacard: {card_path}")
 
 # ------------------------------

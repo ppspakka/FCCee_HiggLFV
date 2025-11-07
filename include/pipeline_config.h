@@ -27,6 +27,8 @@ std::unique_ptr<ISelection> makeSelectionByName(const std::string& name);
 // Variables registry
 struct Variables {
     static std::vector<class HistogramManager::VarSpec> getDefault();
+    // 2D variables (correlations). Title should include both axis labels.
+    static std::vector<class HistogramManager::Var2DSpec> getDefault2D();
 };
 
 } // namespace hlfv

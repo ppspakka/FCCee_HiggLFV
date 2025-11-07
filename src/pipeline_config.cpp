@@ -174,10 +174,57 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
         [](const Event&, const Meta& m) -> double { return m.dphi_mu_e; }
     });
     vars.push_back({
-        "m_collinear", "Collinear mass (GeV);M_{collinear} [GeV];Events", 100, 0.0, 200.0,
+        "m_collinear", "Collinear mass (GeV);M_{collinear} [GeV];Events", 200, 0.5, 200.5,
         [](const Event&, const Meta& m) -> double { return m.m_collinear; }
     });
+
+    // additional variables for Z and H candidates
+    vars.push_back({
+        "m_z1", "M_{Z1} (GeV);M_{Z1} [GeV];Events", 200, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_z1; }
+    });
+    vars.push_back({
+        "m_z2", "M_{Z2} (GeV);M_{Z2} [GeV];Events", 200, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_z2; }
+    });
+    vars.push_back({
+        "m_h1", "M_{H1} (GeV);M_{H1} [GeV];Events", 200, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_h1; }
+    });
+    vars.push_back({
+        "m_h2", "M_{H2} (GeV);M_{H2} [GeV];Events", 200, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_h2; }
+    });
+
     return vars;
+}
+
+// ---- 2D variables registry ----
+std::vector<HistogramManager::Var2DSpec> Variables::getDefault2D() {
+    std::vector<HistogramManager::Var2DSpec> vars2d;
+    // Example correlations using existing Meta fields
+    vars2d.push_back({
+        "mZ_vs_mH1", "M_{Z1} vs M_{H1};M_{Z1} [GeV];M_{H1} [GeV]",
+        100, 0.5, 200.5,
+        100, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_z1; },
+        [](const Event&, const Meta& m) -> double { return m.m_h1; }
+    });
+    vars2d.push_back({
+        "mZ2_vs_mH2", "M_{Z2} vs M_{H2};M_{Z2} [GeV];M_{H2} [GeV]",
+        100, 0.5, 200.5,
+        100, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_z2; },
+        [](const Event&, const Meta& m) -> double { return m.m_h2; }
+    });
+    vars2d.push_back({
+        "pt_mu_vs_pt_e", "p_{T}(#mu) vs p_{T}(e);p_{T}(#mu) [GeV];p_{T}(e) [GeV]",
+        50, 0.0, 100.0,
+        50, 0.0, 100.0,
+        [](const Event&, const Meta& m) -> double { return m.h_mu_pt; },
+        [](const Event&, const Meta& m) -> double { return m.h_e_pt; }
+    });
+    return vars2d;
 }
 
 } // namespace hlfv

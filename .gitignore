@@ -8,4 +8,4 @@ out_plots_eeZH/
 *.root
 CutPython.py
 *.sh
-.vscode/*
+.vscode/
