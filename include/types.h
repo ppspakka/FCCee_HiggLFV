@@ -12,7 +12,8 @@ struct Parameters {
     // Z->ll parameters
     double z_mass;
     double zl_pt_min;
-    double z_mass_window;
+    double z_mass_window_upper;
+    double z_mass_window_lower;
     // H->mue parameters
     double mu_pt_min;
     double e_pt_min;

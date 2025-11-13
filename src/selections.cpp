@@ -164,8 +164,8 @@ bool ZToLLSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) 
             l1.SetPtEtaPhiM(evt.d->Electron_PT[i], evt.d->Electron_Eta[i], evt.d->Electron_Phi[i], Me);
             l2.SetPtEtaPhiM(evt.d->Electron_PT[j], evt.d->Electron_Eta[j], evt.d->Electron_Phi[j], Me);
             double mass = (l1+l2).M();
-            double diff = std::abs(mass - cfg.z_mass);
-            if (diff < cfg.z_mass_window && diff < bestDiff) {
+            double diff = mass - cfg.z_mass;
+            if (diff < cfg.z_mass_window_upper && diff > -cfg.z_mass_window_lower && diff < bestDiff) {
                 bestDiff = diff; best_i = i; best_j = j; best_flav = 0; bestMass = mass;
             }
         }
@@ -179,8 +179,8 @@ bool ZToLLSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) 
             l1.SetPtEtaPhiM(evt.d->Muon_PT[i], evt.d->Muon_Eta[i], evt.d->Muon_Phi[i], Mmu);
             l2.SetPtEtaPhiM(evt.d->Muon_PT[j], evt.d->Muon_Eta[j], evt.d->Muon_Phi[j], Mmu);
             double mass = (l1+l2).M();
-            double diff = std::abs(mass - cfg.z_mass);
-            if (diff < cfg.z_mass_window && diff < bestDiff) {
+            double diff = mass - cfg.z_mass;
+            if (diff < cfg.z_mass_window_upper && diff > -cfg.z_mass_window_lower && diff < bestDiff) {
                 bestDiff = diff; best_i = i; best_j = j; best_flav = 1; bestMass = mass;
             }
         }
@@ -273,8 +273,8 @@ bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
             l2.SetPtEtaPhiM(evt.d->Electron_PT[idx], evt.d->Electron_Eta[idx],
                             evt.d->Electron_Phi[idx], Me);
             double mass = (l1 + l2).M();
-            double diff = std::abs(mass - cfg.z_mass);
-            if (diff < cfg.z_mass_window) {
+            double diff = mass - cfg.z_mass;
+            if (diff < cfg.z_mass_window_upper && diff > -cfg.z_mass_window_lower) {
                 if (diff < bestDiff) {
                     bestDiff = diff;
                     bestMass = mass;
@@ -297,8 +297,8 @@ bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
             l2.SetPtEtaPhiM(evt.d->Muon_PT[idx], evt.d->Muon_Eta[idx],
                             evt.d->Muon_Phi[idx], Mmu);
             double mass = (l1 + l2).M();
-            double diff = std::abs(mass - cfg.z_mass);
-            if (diff < cfg.z_mass_window) {
+            double diff = mass - cfg.z_mass;
+            if (diff < cfg.z_mass_window_upper && diff > -cfg.z_mass_window_lower) {
                 if (diff < bestDiff) {
                     bestDiff = diff;
                     bestMass = mass;

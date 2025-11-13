@@ -6,10 +6,10 @@
     "lepton_pt_min": 10.0,
 
     "_comment2": "==== Z -> ll cuts ====",
-    "z_mass": 91,
+    "z_mass": 91.0,
     "zl_pt_min": 10.0,
-    "z_mass_window_upper": 5.0,
-    "z_mass_window_lower": 5.0,
+    "z_mass_window_upper": 1.0,
+    "z_mass_window_lower": 30.0,
 
     "_comment3": "==== H -> e tau_mu cut ====",
     "mu_pt_min": 20.0,
