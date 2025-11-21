@@ -479,7 +479,7 @@ bool HToETauMuSelection::apply(const Event& evt, Meta& meta, const Parameters& c
     }
     // collinear mass
     if (evt.d->MissingET_size > 0) {
-        meta.m_collinear = computeCollinearMassETauMu(evt, idx_tau_mu, idx_e);
+        meta.m_collinear = computeCollinearMassETauMu(evt, idx_e, idx_tau_mu);
     }
     return true;
 }
