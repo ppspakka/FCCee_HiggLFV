@@ -203,6 +203,25 @@ class NumpyHist1D:
         if i > nb:
             i = nb
         return float(self._errors[i - 1])
+    
+    # Get 
+    def Merge(self, other: "NumpyHist1D") -> "NumpyHist1D":
+        if not np.array_equal(self._xaxis.edges, other._xaxis.edges):
+            raise ValueError("Cannot merge histograms with different binning.")
+        new_contents = self._contents + other._contents
+        new_errors = np.sqrt(self._errors**2 + other._errors**2)
+        new_entries = self._entries + other._entries
+        merged_hist = NumpyHist1D(
+            name=self._name,
+            title=self._title,
+            edges=self._xaxis.edges,
+            contents=new_contents,
+            errors=new_errors,
+            entries=new_entries,
+            x_title=self._xaxis.GetTitle(),
+            y_title=self._yaxis.GetTitle()
+        )
+        return merged_hist
 
     # Convenience accessors
     @property
@@ -409,6 +428,28 @@ class NumpyHist2D:
         if iy > nby:
             iy = nby
         return float(self._errors[ix - 1, iy - 1])
+    
+    def Merge(self, other: "NumpyHist2D") -> "NumpyHist2D":
+        if not np.array_equal(self._xaxis.edges, other._xaxis.edges):
+            raise ValueError("Cannot merge histograms with different X binning.")
+        if not np.array_equal(self._yaxis.edges, other._yaxis.edges):
+            raise ValueError("Cannot merge histograms with different Y binning.")
+        new_contents = self._contents + other._contents
+        new_errors = np.sqrt(self._errors**2 + other._errors**2)
+        new_entries = self._entries + other._entries
+        merged_hist = NumpyHist2D(
+            name=self._name,
+            title=self._title,
+            x_edges=self._xaxis.edges,
+            y_edges=self._yaxis.edges,
+            contents=new_contents,
+            errors=new_errors,
+            entries=new_entries,
+            x_title=self._xaxis.GetTitle(),
+            y_title=self._yaxis.GetTitle(),
+            z_title=self._z_title
+        )
+        return merged_hist
 
     # Convenience
     @property

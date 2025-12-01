@@ -9,3 +9,6 @@ out_plots_eeZH/
 CutPython.py
 *.sh
 .vscode/
+outputs/
+datacards_*/
+HLFV_paper/
