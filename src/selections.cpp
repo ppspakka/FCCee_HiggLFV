@@ -194,6 +194,7 @@ bool ZToLLSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) 
 
 
 
+
 /*
     II) Z candidate selection:
         1) Identify flavor of Z candidate (ee or mumu) from the selected leptons
@@ -338,6 +339,9 @@ bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
                                 evt.d->Electron_Phi[remaining_lep_index], Me);
                 meta.m_z2 = (l1 + l2).M();
             }
+            meta.h_e_pt = evt.d->Electron_PT[remaining_lep_index];
+            meta.h_mu_pt = evt.d->Muon_PT[meta.l1_index];
+
         } else if (z_flav == 1) {
             // Z->mumu
             for (int i = 2; i <=4; ++i) {
@@ -355,10 +359,12 @@ bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
                                 evt.d->Muon_Phi[remaining_lep_index], Mmu);
                 meta.m_z2 = (l1 + l2).M();
             }
+            meta.h_mu_pt = evt.d->Muon_PT[remaining_lep_index];
+            meta.h_e_pt = evt.d->Electron_PT[meta.l1_index];
         }
         return true;
 
-    } // TODO: Should we require ONLY one valid Z candidate? (within mass window, if multiple combinations found -> reject)
+    }
     return false;
 }
 

@@ -14,6 +14,7 @@ import os
 import concurrent.futures
 import argparse
 from dataclasses import dataclass
+import shutil
 from typing import List, Dict, Any
 
 # -------------------------
@@ -29,10 +30,16 @@ ETAUMU_OFFSHELL_PIPELINE = "./pipeline_etaumu_Zoffshell.json"
 
 # Save path
 PARENT_DIR = Path("./normal_cuts")
-MUTAUE_DIR = PARENT_DIR / "mutaue_hist"
-ETAUMU_DIR = PARENT_DIR / "etaumu_hist"
-MUTAUE_OFFSHELL_DIR = PARENT_DIR / "mutaue_Zoffshell_hist"
-ETAUMU_OFFSHELL_DIR = PARENT_DIR / "etaumu_Zoffshell_hist"
+# MUTAUE_DIR = PARENT_DIR / "mutaue_hist"
+# ETAUMU_DIR = PARENT_DIR / "etaumu_hist"
+# MUTAUE_OFFSHELL_DIR = PARENT_DIR / "mutaue_Zoffshell_hist"
+# ETAUMU_OFFSHELL_DIR = PARENT_DIR / "etaumu_Zoffshell_hist"
+
+# Place dummy
+MUTAUE_DIR = None
+ETAUMU_DIR = None
+MUTAUE_OFFSHELL_DIR = None
+ETAUMU_OFFSHELL_DIR = None
 
 # Backgrounds
 BACKGROUNDS = [
@@ -164,7 +171,7 @@ def run_job(job: Job, verbose_prefix: bool = True) -> int:
             logf.write(line)
         return proc.wait()
 
-def run_makecard_commands(dry_run: bool = False):
+def run_makecard_commands(args, dry_run: bool = False):
     """Builds and runs the makecard.py commands for channels that were processed."""
     print("\n" + "="*30)
     print("Starting makecard generation")
@@ -173,22 +180,22 @@ def run_makecard_commands(dry_run: bool = False):
     makecard_jobs: Dict[str, Any] = {
         "mutaue": {
             "in_dir": MUTAUE_DIR,
-            "out_dir": Path(f"{PARENT_DIR}/datacards_{MUTAUE_DIR.name.replace('_hist', '')}"),
+            "out_dir": Path(f"{args.output_dir}/datacards_{MUTAUE_DIR.name.replace('_hist', '')}"),
             "enabled": CONFIG["mutaue_signal"] or CONFIG["mutaue_background"]
         },
         "etaumu": {
             "in_dir": ETAUMU_DIR,
-            "out_dir": Path(f"{PARENT_DIR}/datacards_{ETAUMU_DIR.name.replace('_hist', '')}"),
+            "out_dir": Path(f"{args.output_dir}/datacards_{ETAUMU_DIR.name.replace('_hist', '')}"),
             "enabled": CONFIG["etaumu_signal"] or CONFIG["etaumu_background"]
         },
         "mutaue_offshell": {
             "in_dir": MUTAUE_OFFSHELL_DIR,
-            "out_dir": Path(f"{PARENT_DIR}/datacards_{MUTAUE_OFFSHELL_DIR.name.replace('_hist', '')}"),
+            "out_dir": Path(f"{args.output_dir}/datacards_{MUTAUE_OFFSHELL_DIR.name.replace('_hist', '')}"),
             "enabled": CONFIG["mutaue_offshell_signal"] or CONFIG["mutaue_offshell_background"]
         },
         "etaumu_offshell": {
             "in_dir": ETAUMU_OFFSHELL_DIR,
-            "out_dir": Path(f"{PARENT_DIR}/datacards_{ETAUMU_OFFSHELL_DIR.name.replace('_hist', '')}"),
+            "out_dir": Path(f"{args.output_dir}/datacards_{ETAUMU_OFFSHELL_DIR.name.replace('_hist', '')}"),
             "enabled": CONFIG["etaumu_offshell_signal"] or CONFIG["etaumu_offshell_background"]
         },
     }
@@ -247,27 +254,26 @@ def run_makecard_commands(dry_run: bool = False):
         
 def run_sbatch_commands(args):
     # Copy the datacards/run_limits.py and datacards/slurm_submit.slurm to each output directory
-    import shutil
     script_files = ["datacards/run_limits.py", "datacards/slurm_submit.slurm"]
     makecard_jobs: Dict[str, Any] = {
         "mutaue": {
             "in_dir": MUTAUE_DIR,
-            "out_dir": Path(f"{PARENT_DIR}/datacards_{MUTAUE_DIR.name.replace('_hist', '')}"),
+            "out_dir": Path(f"{args.output_dir}/datacards_{MUTAUE_DIR.name.replace('_hist', '')}"),
             "enabled": CONFIG["mutaue_signal"] or CONFIG["mutaue_background"]
         },
         "etaumu": {
             "in_dir": ETAUMU_DIR,
-            "out_dir": Path(f"{PARENT_DIR}/datacards_{ETAUMU_DIR.name.replace('_hist', '')}"),
+            "out_dir": Path(f"{args.output_dir}/datacards_{ETAUMU_DIR.name.replace('_hist', '')}"),
             "enabled": CONFIG["etaumu_signal"] or CONFIG["etaumu_background"]
         },
         "mutaue_offshell": {
             "in_dir": MUTAUE_OFFSHELL_DIR,
-            "out_dir": Path(f"{PARENT_DIR}/datacards_{MUTAUE_OFFSHELL_DIR.name.replace('_hist', '')}"),
+            "out_dir": Path(f"{args.output_dir}/datacards_{MUTAUE_OFFSHELL_DIR.name.replace('_hist', '')}"),
             "enabled": CONFIG["mutaue_offshell_signal"] or CONFIG["mutaue_offshell_background"]
         },
         "etaumu_offshell": {
             "in_dir": ETAUMU_OFFSHELL_DIR,
-            "out_dir": Path(f"{PARENT_DIR}/datacards_{ETAUMU_OFFSHELL_DIR.name.replace('_hist', '')}"),
+            "out_dir": Path(f"{args.output_dir}/datacards_{ETAUMU_OFFSHELL_DIR.name.replace('_hist', '')}"),
             "enabled": CONFIG["etaumu_offshell_signal"] or CONFIG["etaumu_offshell_background"]
         },
     }
@@ -329,6 +335,14 @@ def main():
     parser.add_argument("--skip-run", action="store_true", help="skip the job execution step")
     args = parser.parse_args()
 
+    print("Output directory set to:", args.output_dir)
+    # TOBE CLEAR: OVERRIDE THE GLOBAL PATHS HERE
+    global MUTAUE_DIR, ETAUMU_DIR, MUTAUE_OFFSHELL_DIR, ETAUMU_OFFSHELL_DIR
+    MUTAUE_DIR = Path(args.output_dir) / "mutaue_hist"
+    ETAUMU_DIR = Path(args.output_dir) / "etaumu_hist"
+    MUTAUE_OFFSHELL_DIR = Path(args.output_dir) / "mutaue_Zoffshell_hist"
+    ETAUMU_OFFSHELL_DIR = Path(args.output_dir) / "etaumu_Zoffshell_hist"
+
     ensure_dirs()
     jobs = build_jobs()
 
@@ -366,6 +380,16 @@ def main():
                 except Exception as e:
                     print(f"Job EXCEPTION for {job.input_path}: {e}")
                     failures.append((job, -1))
+        
+        
+        pipeline_files = [MUTAUE_PIPELINE, ETAUMU_PIPELINE, MUTAUE_OFFSHELL_PIPELINE, ETAUMU_OFFSHELL_PIPELINE]
+        for pf in pipeline_files:
+            dest = Path(args.output_dir) / Path(pf).name
+            try:
+                shutil.copy(pf, dest)
+                print(f"Copied {pf} to {dest}")
+            except Exception as e:
+                print(f"Failed to copy {pf} to {dest}: {e}")
 
     if failures:
         print(f"\n{len(failures)} jobs failed. Check logs.")
@@ -374,7 +398,7 @@ def main():
     else:
         print("\nAll processing completed successfully.")
         if not args.skip_makecard:
-            run_makecard_commands()
+            run_makecard_commands(args)
         else:
             print("\nSkipping makecard step as requested.")
         
