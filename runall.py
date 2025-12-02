@@ -10,6 +10,7 @@ Parallel runner converted from runall.sh
 from pathlib import Path
 import subprocess
 import sys
+import os
 import concurrent.futures
 import argparse
 from dataclasses import dataclass
@@ -243,6 +244,78 @@ def run_makecard_commands(dry_run: bool = False):
         sys.exit(3)
     else:
         print("\nAll makecard jobs completed successfully.")
+        
+def run_sbatch_commands(args):
+    # Copy the datacards/run_limits.py and datacards/slurm_submit.slurm to each output directory
+    import shutil
+    script_files = ["datacards/run_limits.py", "datacards/slurm_submit.slurm"]
+    makecard_jobs: Dict[str, Any] = {
+        "mutaue": {
+            "in_dir": MUTAUE_DIR,
+            "out_dir": Path(f"{PARENT_DIR}/datacards_{MUTAUE_DIR.name.replace('_hist', '')}"),
+            "enabled": CONFIG["mutaue_signal"] or CONFIG["mutaue_background"]
+        },
+        "etaumu": {
+            "in_dir": ETAUMU_DIR,
+            "out_dir": Path(f"{PARENT_DIR}/datacards_{ETAUMU_DIR.name.replace('_hist', '')}"),
+            "enabled": CONFIG["etaumu_signal"] or CONFIG["etaumu_background"]
+        },
+        "mutaue_offshell": {
+            "in_dir": MUTAUE_OFFSHELL_DIR,
+            "out_dir": Path(f"{PARENT_DIR}/datacards_{MUTAUE_OFFSHELL_DIR.name.replace('_hist', '')}"),
+            "enabled": CONFIG["mutaue_offshell_signal"] or CONFIG["mutaue_offshell_background"]
+        },
+        "etaumu_offshell": {
+            "in_dir": ETAUMU_OFFSHELL_DIR,
+            "out_dir": Path(f"{PARENT_DIR}/datacards_{ETAUMU_OFFSHELL_DIR.name.replace('_hist', '')}"),
+            "enabled": CONFIG["etaumu_offshell_signal"] or CONFIG["etaumu_offshell_background"]
+        },
+    }
+    for name, params in makecard_jobs.items():
+        if not params["enabled"]:
+            continue
+        out_dir = params["out_dir"]
+        for script in script_files:
+            dest = out_dir / Path(script).name
+            try:
+                shutil.copy(script, dest)
+                print(f"Copied {script} to {dest}")
+            except Exception as e:
+                print(f"Failed to copy {script} to {dest}: {e}")
+
+    # Copy THEN GO TO EACH DIRECTORY AND SUBMIT
+    # THE SCRIPTS MUST BE USED IN THE SAME DIRECTORY
+    for name, params in makecard_jobs.items():
+        if not params["enabled"]:
+            continue
+        out_dir = params["out_dir"]
+        sbatch_script = out_dir / "slurm_submit.slurm"
+        if not sbatch_script.exists():
+            print(f"SBATCH script not found in {out_dir}, skipping sbatch submission.")
+            continue
+        
+        # USE THE OS.CHDIR TO CHANGE DIRECTORY
+        current_dir = os.getcwd()
+        os.chdir(out_dir)
+        try:
+            cmd = ["sbatch", "slurm_submit.slurm"]
+            print(f"Submitting sbatch job in {out_dir}: CMD: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            print(result.stdout)
+            if result.stderr:
+                print("--- STDERR ---")
+                print(result.stderr)
+            print(f"SBATCH submission for '{name}' completed successfully.")
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR: sbatch submission for '{name}' failed with exit code {e.returncode}.")
+            print("--- STDOUT ---")
+            print(e.stdout)
+            print("--- STDERR ---")
+            print(e.stderr)
+        except FileNotFoundError:
+            print("ERROR: 'sbatch' command not found. Make sure SLURM is installed and configured.")
+        finally:
+            os.chdir(current_dir)
 
 
 def main():
@@ -252,6 +325,8 @@ def main():
     parser.add_argument("--list", action="store_true", help="only list jobs (don't execute)")
     parser.add_argument("--dry-run", action="store_true", help="show commands without running")
     parser.add_argument("--skip-makecard", action="store_true", help="skip the final makecard step")
+    parser.add_argument("--skip-sbatch", action="store_true", help="skip the sbatch submission step after makecard")
+    parser.add_argument("--skip-run", action="store_true", help="skip the job execution step")
     args = parser.parse_args()
 
     ensure_dirs()
@@ -276,20 +351,21 @@ def main():
 
     # Run in ThreadPoolExecutor: subprocesses are external so threads are fine for IO.
     failures = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as exe:
-        future_to_job = {exe.submit(run_job, job): job for job in jobs}
-        for fut in concurrent.futures.as_completed(future_to_job):
-            job = future_to_job[fut]
-            try:
-                rc = fut.result()
-                if rc != 0:
-                    print(f"Job FAILED (rc={rc}): {job.input_path} -> see {job.log_path()}")
-                    failures.append((job, rc))
-                else:
-                    print(f"Job DONE: {job.input_path} -> {job.out_root()}")
-            except Exception as e:
-                print(f"Job EXCEPTION for {job.input_path}: {e}")
-                failures.append((job, -1))
+    if not args.skip_run:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as exe:
+            future_to_job = {exe.submit(run_job, job): job for job in jobs}
+            for fut in concurrent.futures.as_completed(future_to_job):
+                job = future_to_job[fut]
+                try:
+                    rc = fut.result()
+                    if rc != 0:
+                        print(f"Job FAILED (rc={rc}): {job.input_path} -> see {job.log_path()}")
+                        failures.append((job, rc))
+                    else:
+                        print(f"Job DONE: {job.input_path} -> {job.out_root()}")
+                except Exception as e:
+                    print(f"Job EXCEPTION for {job.input_path}: {e}")
+                    failures.append((job, -1))
 
     if failures:
         print(f"\n{len(failures)} jobs failed. Check logs.")
@@ -301,7 +377,9 @@ def main():
             run_makecard_commands()
         else:
             print("\nSkipping makecard step as requested.")
-
+        
+        if not args.skip_sbatch:
+            run_sbatch_commands(args)
 
 if __name__ == "__main__":
     main()

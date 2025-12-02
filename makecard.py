@@ -58,7 +58,7 @@ cross_sections_pb = {
 # Uncertainties framework (editable)
 GLOBAL_UNC = {
     # applies to all processes (signal and background)
-    "lumi": 1.11,
+    "lumi": 1.02,
 }
 
 # PROC_UNC is constructed dynamically for backgrounds with 2.0
@@ -71,7 +71,7 @@ GLOBAL_UNC = {
 # }
 # For now we will create {"bkg_unc": 2.0} for each background.
 BACKGROUND_UNC_NAME = "bkg_unc"
-BACKGROUND_UNC_VALUE = 2.0
+BACKGROUND_UNC_VALUE = 1.3 # 30% uncertainty on backgrounds
 
 # ------------------------------
 # Helpers
