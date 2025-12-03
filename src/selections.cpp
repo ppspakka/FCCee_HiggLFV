@@ -67,11 +67,25 @@ namespace {
         double delta_phi = deltaPhiFromPhis(phi_lep, phi_met);
         return std::sqrt(2 * pt_lep * met * (1 - std::cos(delta_phi)));
     }
+
+    // compute DeltaR between two objects given their eta and phi
+    // input (flavor1, eta1, phi1), (flavor2, eta2, phi2)
+    static double computeDeltaR(int flav1, double eta1, double phi1,
+                                int flav2, double eta2, double phi2) {
+        TLorentzVector v1, v2;
+        double mass1 = (flav1 == 0) ? Me : Mmu;
+        double mass2 = (flav2 == 0) ? Me : Mmu;
+        v1.SetPtEtaPhiM(1.0, eta1, phi1, mass1);
+        v2.SetPtEtaPhiM(1.0, eta2, phi2, mass2);
+        return v1.DeltaR(v2);
+    }
 } // anonymous namespace
 
 // test add empty cut
 std::string EmptySelection::name() const { return "EmptySelection"; }
 bool EmptySelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
+    // Test add the Transverse mass < 2.0 GeV for the electron
+    if (meta.m_transverse_e >= 2.0) return false;
     return true;
 }
 
@@ -455,7 +469,9 @@ bool HToMuTauESelection::apply(const Event& evt, Meta& meta, const Parameters& c
         // Z->mumu, remaining lepton is electron
         meta.m_h2 = computeCollinearMassMuTauE(evt, zl2, idx_e);
     }
-    
+    meta.deltaR_mu_e = computeDeltaR(1, evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu],
+                                     0, evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e]);
+
     return true;
 }
 
@@ -526,6 +542,8 @@ bool HToETauMuSelection::apply(const Event& evt, Meta& meta, const Parameters& c
         // Z->mumu, remaining lepton is electron
         meta.m_h2 = computeCollinearMassETauMu(evt, idx_e, zl2);
     }
+    meta.deltaR_mu_e = computeDeltaR(1, evt.d->Muon_Eta[idx_tau_mu], evt.d->Muon_Phi[idx_tau_mu],
+                                     0, evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e]);
 
     return true;
 }

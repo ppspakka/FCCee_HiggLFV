@@ -196,6 +196,10 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
         "m_transverse_mu", "Transverse mass (#mu) (GeV);M_{T}(#mu) [GeV];Events", 120, 0.0, 120.0,
         [](const Event&, const Meta& m) -> double { return m.m_transverse_mu; }
     });
+    vars.push_back({
+        "deltaR_mu_e", "#DeltaR(#mu,e);#DeltaR;Events", 60, 0.0, 6.0,
+        [](const Event&, const Meta& m) -> double { return m.deltaR_mu_e; }
+    });
 
     // additional variables for Z and H candidates
     vars.push_back({
