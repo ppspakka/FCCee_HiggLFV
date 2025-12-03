@@ -398,11 +398,14 @@ bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
             meta.h_mu_pt = evt.d->Muon_PT[remaining_lep_index];
             meta.h_e_pt = evt.d->Electron_PT[meta.l1_index];
         }
-        return true;
 
-        // recoil mass calculation
-        TLorentzVector p_beam;
-        p_beam.SetPxPyPzE(0.0, 0.0, cfg.beam_energy, cfg.beam_energy);
+
+        // recoil mass calculation (240 GeV collider)
+        TLorentzVector p_beam1, p_beam2, p_beam_total;
+        double beam_energy = 240.0 / 2.0;
+        p_beam1.SetPxPyPzE(0.0, 0.0, beam_energy, beam_energy);
+        p_beam2.SetPxPyPzE(0.0, 0.0, -beam_energy, beam_energy);
+        p_beam_total = p_beam1 + p_beam2;
         TLorentzVector p_z;
         if (z_flav == 0) {
             // Z->ee
@@ -421,10 +424,18 @@ bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
                             evt.d->Muon_Phi[meta.z_l2], Mmu);
             p_z = l1 + l2;
         }
-        TLorentzVector p_recoil = p_beam - p_z;
-        meta.m_recoil = p_recoil.M();
+        TLorentzVector p_recoil = p_beam_total - p_z;
+        meta.m_recoil = p_recoil.M(); // this actually higgs
+        // debug print recoil mass
+        // std::cout << "Recoil mass: " << meta.m_recoil << std::endl;
 
+        // Perform the boost 
+        TVector3 boost_vector = -p_recoil.BoostVector();
+        meta.beta_x = boost_vector.X();
+        meta.beta_y = boost_vector.Y();
+        meta.beta_z = boost_vector.Z();
 
+        return true;
     }
     return false;
 }
@@ -497,9 +508,20 @@ bool HToMuTauESelection::apply(const Event& evt, Meta& meta, const Parameters& c
     meta.deltaR_mu_e = computeDeltaR(1, evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu],
                                      0, evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e]);
 
+    
+    // boost leptons to Higgs rest frame
+    TVector3 boost_vector(meta.beta_x, meta.beta_y, meta.beta_z);
+    TLorentzVector muon_vec, electron_vec;
+    muon_vec.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
+    electron_vec.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
+    muon_vec.Boost(boost_vector);
+    electron_vec.Boost(boost_vector);
+    
+    meta.h_mu_boosted_pt = muon_vec.Pt();
+    meta.h_e_boosted_pt = electron_vec.Pt();
+
     return true;
 }
-
 // H->e tau_mu selection
 std::string HToETauMuSelection::name() const { return "H_to_etau_mu"; }
 bool HToETauMuSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
@@ -569,6 +591,17 @@ bool HToETauMuSelection::apply(const Event& evt, Meta& meta, const Parameters& c
     }
     meta.deltaR_mu_e = computeDeltaR(1, evt.d->Muon_Eta[idx_tau_mu], evt.d->Muon_Phi[idx_tau_mu],
                                      0, evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e]);
+
+    // boost leptons to Higgs rest frame
+    TVector3 boost_vector(meta.beta_x, meta.beta_y, meta.beta_z);
+    TLorentzVector muon_vec, electron_vec;
+    muon_vec.SetPtEtaPhiM(evt.d->Muon_PT[idx_tau_mu], evt.d->Muon_Eta[idx_tau_mu], evt.d->Muon_Phi[idx_tau_mu], Mmu);
+    electron_vec.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
+    muon_vec.Boost(boost_vector);
+    electron_vec.Boost(boost_vector);
+
+    meta.h_mu_boosted_pt = muon_vec.Pt();
+    meta.h_e_boosted_pt = electron_vec.Pt();
 
     return true;
 }

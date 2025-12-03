@@ -47,7 +47,9 @@ struct Meta {
     int h_mu = -1;
     int h_e = -1;
     double h_mu_pt = std::numeric_limits<double>::quiet_NaN();
+    double h_mu_boosted_pt = std::numeric_limits<double>::quiet_NaN();
     double h_e_pt = std::numeric_limits<double>::quiet_NaN();
+    double h_e_boosted_pt = std::numeric_limits<double>::quiet_NaN();
     double dphi_e_met = std::numeric_limits<double>::quiet_NaN();
     double dphi_mu_met = std::numeric_limits<double>::quiet_NaN();
     double dphi_mu_e = std::numeric_limits<double>::quiet_NaN();
@@ -69,6 +71,11 @@ struct Meta {
     double m_h1 = std::numeric_limits<double>::quiet_NaN();
     // m_h case 2 choose Z second pair, remaining used to calculate col mass
     double m_h2 = std::numeric_limits<double>::quiet_NaN();
+
+    // boost vector
+    double beta_x = std::numeric_limits<double>::quiet_NaN();
+    double beta_y = std::numeric_limits<double>::quiet_NaN();
+    double beta_z = std::numeric_limits<double>::quiet_NaN();
 };
 
 } // namespace hlfv

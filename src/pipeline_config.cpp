@@ -222,7 +222,14 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
         "m_h2", "M_{H2} (GeV);M_{H2} [GeV];Events", 200, 0.5, 200.5,
         [](const Event&, const Meta& m) -> double { return m.m_h2; }
     });
-
+    vars.push_back({
+        "h_mu_boosted_pt", "Boosted p_{T}(#mu) (GeV);p_{T}(#mu) [GeV];Events", 50, 0.0, 100.0,
+        [](const Event&, const Meta& m) -> double { return m.h_mu_boosted_pt; }
+    });
+    vars.push_back({
+        "h_e_boosted_pt", "Boosted p_{T}(e) (GeV);p_{T}(e) [GeV];Events", 50, 0.0, 100.0,
+        [](const Event&, const Meta& m) -> double { return m.h_e_boosted_pt; }
+    });
     return vars;
 }
 
