@@ -400,6 +400,31 @@ bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
         }
         return true;
 
+        // recoil mass calculation
+        TLorentzVector p_beam;
+        p_beam.SetPxPyPzE(0.0, 0.0, cfg.beam_energy, cfg.beam_energy);
+        TLorentzVector p_z;
+        if (z_flav == 0) {
+            // Z->ee
+            TLorentzVector l1, l2;
+            l1.SetPtEtaPhiM(evt.d->Electron_PT[meta.z_l1], evt.d->Electron_Eta[meta.z_l1],
+                            evt.d->Electron_Phi[meta.z_l1], Me);
+            l2.SetPtEtaPhiM(evt.d->Electron_PT[meta.z_l2], evt.d->Electron_Eta[meta.z_l2],
+                            evt.d->Electron_Phi[meta.z_l2], Me);
+            p_z = l1 + l2;
+        } else if (z_flav == 1) {
+            // Z->mumu
+            TLorentzVector l1, l2;
+            l1.SetPtEtaPhiM(evt.d->Muon_PT[meta.z_l1], evt.d->Muon_Eta[meta.z_l1],
+                            evt.d->Muon_Phi[meta.z_l1], Mmu);
+            l2.SetPtEtaPhiM(evt.d->Muon_PT[meta.z_l2], evt.d->Muon_Eta[meta.z_l2],
+                            evt.d->Muon_Phi[meta.z_l2], Mmu);
+            p_z = l1 + l2;
+        }
+        TLorentzVector p_recoil = p_beam - p_z;
+        meta.m_recoil = p_recoil.M();
+
+
     }
     return false;
 }

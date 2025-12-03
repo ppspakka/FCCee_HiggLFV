@@ -56,6 +56,8 @@ struct Meta {
     // transverse mass
     double m_transverse_e = std::numeric_limits<double>::quiet_NaN();
     double m_transverse_mu = std::numeric_limits<double>::quiet_NaN();
+    // recoil mass
+    double m_recoil = std::numeric_limits<double>::quiet_NaN();
 
     double deltaR_mu_e = std::numeric_limits<double>::quiet_NaN();
 

@@ -200,6 +200,10 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
         "deltaR_mu_e", "#DeltaR(#mu,e);#DeltaR;Events", 60, 0.0, 6.0,
         [](const Event&, const Meta& m) -> double { return m.deltaR_mu_e; }
     });
+    vars.push_back({
+        "m_recoil", "Recoil mass (GeV);M_{recoil} [GeV];Events", 200, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_recoil; }
+    });
 
     // additional variables for Z and H candidates
     vars.push_back({
