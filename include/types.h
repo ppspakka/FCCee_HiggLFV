@@ -53,6 +53,9 @@ struct Meta {
     double dphi_mu_e = std::numeric_limits<double>::quiet_NaN();
     // collinear mass
     double m_collinear = std::numeric_limits<double>::quiet_NaN();
+    // transverse mass
+    double m_transverse_e = std::numeric_limits<double>::quiet_NaN();
+    double m_transverse_mu = std::numeric_limits<double>::quiet_NaN();
 
     // m_Z candidate case 1 (closest pair)
     double m_z1 = std::numeric_limits<double>::quiet_NaN();

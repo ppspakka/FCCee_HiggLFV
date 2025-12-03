@@ -45,6 +45,28 @@ namespace {
         vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
         return (vmu + ve + vmiss).M();
     }
+
+    // compute the transverse mass, mode=0 for e and 1 for mu
+    static double computeTransverseMass(const Event& evt, int mode, int idx_lep) {
+        if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
+        double pt_lep = 0.0;
+        double phi_lep = 0.0;
+        if (mode == 0) {
+            // electron
+            pt_lep = evt.d->Electron_PT[idx_lep];
+            phi_lep = evt.d->Electron_Phi[idx_lep];
+        } else if (mode == 1) {
+            // muon
+            pt_lep = evt.d->Muon_PT[idx_lep];
+            phi_lep = evt.d->Muon_Phi[idx_lep];
+        } else {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        double met = evt.d->MissingET_MET[0];
+        double phi_met = evt.d->MissingET_Phi[0];
+        double delta_phi = deltaPhiFromPhis(phi_lep, phi_met);
+        return std::sqrt(2 * pt_lep * met * (1 - std::cos(delta_phi)));
+    }
 } // anonymous namespace
 
 // test add empty cut
@@ -417,6 +439,8 @@ bool HToMuTauESelection::apply(const Event& evt, Meta& meta, const Parameters& c
     // collinear mass
     if (evt.d->MissingET_size > 0) {
         meta.m_collinear = computeCollinearMassMuTauE(evt, idx_mu, idx_e);
+        meta.m_transverse_e = computeTransverseMass(evt, 0, idx_e);
+        meta.m_transverse_mu = computeTransverseMass(evt, 1, idx_mu);
     }
 
     // calculate collinear mass in 2 scenarios
@@ -486,7 +510,23 @@ bool HToETauMuSelection::apply(const Event& evt, Meta& meta, const Parameters& c
     // collinear mass
     if (evt.d->MissingET_size > 0) {
         meta.m_collinear = computeCollinearMassETauMu(evt, idx_e, idx_tau_mu);
+        meta.m_transverse_e = computeTransverseMass(evt, 0, idx_e);  // wrong calculate transverse mass for electron
+        meta.m_transverse_mu = computeTransverseMass(evt, 1, idx_tau_mu);
     }
+
+    // calculate collinear mass in 2 scenarios
+    // Scenario 1: consider Z candidate with closest mass to m_Z a Z's leptons-> same as above
+    meta.m_h1 = meta.m_collinear;
+    // Scenario 2: consider second best Z candidate's leptons as Z's leptons -> causing the H collinear mass to be
+    // calculated using the remaining leptons (h_e, zl2, MET) or m_h2 = collinear mass of system (h_e, zl2, MET)
+    if (meta.z_flavor == 0) {
+        // Z->ee, remaining lepton is muon
+        meta.m_h2 = computeCollinearMassETauMu(evt, zl2, idx_tau_mu);
+    } else if (meta.z_flavor == 1) {
+        // Z->mumu, remaining lepton is electron
+        meta.m_h2 = computeCollinearMassETauMu(evt, idx_e, zl2);
+    }
+
     return true;
 }
 

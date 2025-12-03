@@ -178,6 +178,24 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
         "m_collinear", "Collinear mass (GeV);M_{collinear} [GeV];Events", 200, 0.5, 200.5,
         [](const Event&, const Meta& m) -> double { return m.m_collinear; }
     });
+    vars.push_back({
+        "m_transverse_e_fine", "Transverse mass (e) (GeV);M_{T}(e) [GeV];Events", 300, 0.01, 3.01,
+        [](const Event&, const Meta& m) -> double { return m.m_transverse_e; }
+    });
+    vars.push_back({
+        "m_transverse_mu_fine", "Transverse mass (#mu) (GeV);M_{T}(#mu) [GeV];Events", 300, 0.01, 3.01,
+        [](const Event&, const Meta& m) -> double { return m.m_transverse_mu; }
+    });
+
+    // rough transverse mass histograms
+    vars.push_back({
+        "m_transverse_e", "Transverse mass (e) (GeV);M_{T}(e) [GeV];Events", 120, 0.0, 120.0,
+        [](const Event&, const Meta& m) -> double { return m.m_transverse_e; }
+    });
+    vars.push_back({
+        "m_transverse_mu", "Transverse mass (#mu) (GeV);M_{T}(#mu) [GeV];Events", 120, 0.0, 120.0,
+        [](const Event&, const Meta& m) -> double { return m.m_transverse_mu; }
+    });
 
     // additional variables for Z and H candidates
     vars.push_back({
