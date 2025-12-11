@@ -435,6 +435,29 @@ bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
         meta.beta_y = boost_vector.Y();
         meta.beta_z = boost_vector.Z();
 
+        // absolute DZ and D0 for leptons from H decay
+        int h_lep_index = meta.l1_index;
+        if (meta.l1flavor == 0) {
+            // H->e
+            meta.h_e_dz = evt.d->Electron_DZ[h_lep_index];
+            meta.h_e_d0 = evt.d->Electron_D0[h_lep_index];
+        } else if (meta.l1flavor == 1) {
+            // H->mu
+            meta.h_mu_dz = evt.d->Muon_DZ[h_lep_index];
+            meta.h_mu_d0 = evt.d->Muon_D0[h_lep_index];
+        }
+        // remaining lepton DZ and D0
+        if (z_flav == 0) {
+            // Z->ee, remaining lepton is electron
+            meta.h_e_dz = std::abs(evt.d->Electron_DZ[remaining_lep_index]);
+            meta.h_e_d0 = std::abs(evt.d->Electron_D0[remaining_lep_index]);
+        }
+        else if (z_flav == 1) {
+            // Z->mumu, remaining lepton is muon
+            meta.h_mu_dz = std::abs(evt.d->Muon_DZ[remaining_lep_index]);
+            meta.h_mu_d0 = std::abs(evt.d->Muon_D0[remaining_lep_index]);
+        }
+
         return true;
     }
     return false;

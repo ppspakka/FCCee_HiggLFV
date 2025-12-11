@@ -72,6 +72,12 @@ struct Meta {
     // m_h case 2 choose Z second pair, remaining used to calculate col mass
     double m_h2 = std::numeric_limits<double>::quiet_NaN();
 
+    // displaced track: abs(D0), abs(DZ) (only for higgs daughters)
+    double h_e_d0 = std::numeric_limits<double>::quiet_NaN();
+    double h_e_dz = std::numeric_limits<double>::quiet_NaN();
+    double h_mu_d0 = std::numeric_limits<double>::quiet_NaN();
+    double h_mu_dz = std::numeric_limits<double>::quiet_NaN();
+
     // boost vector
     double beta_x = std::numeric_limits<double>::quiet_NaN();
     double beta_y = std::numeric_limits<double>::quiet_NaN();

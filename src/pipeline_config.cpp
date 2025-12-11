@@ -230,6 +230,27 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
         "h_e_boosted_pt", "Boosted p_{T}(e) (GeV);p_{T}(e) [GeV];Events", 50, 0.0, 100.0,
         [](const Event&, const Meta& m) -> double { return m.h_e_boosted_pt; }
     });
+
+    vars.push_back({
+        "h_e_d0", "|D0(e)| (Unknow unit);|D0(e)| [Unknow Unit];Events", 100, 0.0, 0.1,
+        [](const Event&, const Meta& m) -> double { return m.h_e_d0; }
+    });
+
+    vars.push_back({
+        "h_e_dz", "|DZ(e)| (Unknow unit);|DZ(e)| [Unknow Unit];Events", 100, 0.0, 0.5,
+        [](const Event&, const Meta& m) -> double { return m.h_e_dz; }
+    });
+
+    vars.push_back({
+        "h_mu_d0", "|D0(#mu)| (Unknow unit);|D0(#mu)| [Unknow Unit];Events", 100, 0.0, 0.1,
+        [](const Event&, const Meta& m) -> double { return m.h_mu_d0; }
+    });
+
+    vars.push_back({
+        "h_mu_dz", "|DZ(#mu)| (Unknow unit);|DZ(#mu)| [Unknow Unit];Events", 100, 0.0, 0.5,
+        [](const Event&, const Meta& m) -> double { return m.h_mu_dz; }
+    });
+
     return vars;
 }
 
