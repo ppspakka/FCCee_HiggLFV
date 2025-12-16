@@ -18,32 +18,78 @@ namespace {
         return std::abs(v1.DeltaPhi(v2));
     }
 
-    // compute collinear mass for mu + e using missing ET (returns NaN if no MissingET)
+    // // compute collinear mass for mu + e using missing ET (returns NaN if no MissingET)
+    // static double computeCollinearMassMuTauE(const Event& evt, int idx_mu, int idx_e) {
+    //     if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
+    //     TLorentzVector vmu, ve;
+    //     vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
+    //     ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
+    //     double px_miss = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
+    //     double py_miss = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
+    //     double pz_miss = (ve.Pz()/ve.Pt()) * std::sqrt(px_miss*px_miss + py_miss*py_miss);
+    //     double e_miss = std::sqrt(px_miss*px_miss + py_miss*py_miss + pz_miss*pz_miss);
+    //     TLorentzVector vmiss;
+    //     vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
+    //     return (vmu + ve + vmiss).M();
+    // }
+    // static double computeCollinearMassETauMu(const Event& evt, int idx_e, int idx_mu) {
+    //     if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
+    //     TLorentzVector ve, vmu;
+    //     ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
+    //     vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
+    //     double px_miss = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
+    //     double py_miss = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
+    //     double pz_miss = (vmu.Pz()/vmu.Pt()) * std::sqrt(px_miss*px_miss + py_miss*py_miss);
+    //     double e_miss = std::sqrt(px_miss*px_miss + py_miss*py_miss + pz_miss*pz_miss);
+    //     TLorentzVector vmiss;
+    //     vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
+    //     return (vmu + ve + vmiss).M();
+    // }
     static double computeCollinearMassMuTauE(const Event& evt, int idx_mu, int idx_e) {
         if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
+
         TLorentzVector vmu, ve;
         vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
         ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
-        double px_miss = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
-        double py_miss = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
-        double pz_miss = (ve.Pz()/ve.Pt()) * std::sqrt(px_miss*px_miss + py_miss*py_miss);
-        double e_miss = std::sqrt(px_miss*px_miss + py_miss*py_miss + pz_miss*pz_miss);
-        TLorentzVector vmiss;
-        vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
-        return (vmu + ve + vmiss).M();
+
+        if (ve.Pt() <= 0) return std::numeric_limits<double>::quiet_NaN();
+
+        const double met_px = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
+        const double met_py = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
+        const double dir_x = ve.Px() / ve.Pt();
+        const double dir_y = ve.Py() / ve.Pt();
+        const double proj = met_px * dir_x + met_py * dir_y;
+
+        if (proj <= 0) return std::numeric_limits<double>::quiet_NaN();
+
+        const double x_tau_vis = ve.Pt() / (ve.Pt() + proj);
+        if (x_tau_vis <= 0 || x_tau_vis > 1) return std::numeric_limits<double>::quiet_NaN();
+
+        const double m_vis = (vmu + ve).M();
+        return m_vis / std::sqrt(x_tau_vis);
     }
     static double computeCollinearMassETauMu(const Event& evt, int idx_e, int idx_mu) {
         if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
+
         TLorentzVector ve, vmu;
         ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
         vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
-        double px_miss = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
-        double py_miss = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
-        double pz_miss = (vmu.Pz()/vmu.Pt()) * std::sqrt(px_miss*px_miss + py_miss*py_miss);
-        double e_miss = std::sqrt(px_miss*px_miss + py_miss*py_miss + pz_miss*pz_miss);
-        TLorentzVector vmiss;
-        vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
-        return (vmu + ve + vmiss).M();
+
+        if (vmu.Pt() <= 0) return std::numeric_limits<double>::quiet_NaN();
+
+        const double met_px = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
+        const double met_py = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
+        const double dir_x = vmu.Px() / vmu.Pt();
+        const double dir_y = vmu.Py() / vmu.Pt();
+        const double proj = met_px * dir_x + met_py * dir_y;
+
+        if (proj <= 0) return std::numeric_limits<double>::quiet_NaN();
+
+        const double x_tau_vis = vmu.Pt() / (vmu.Pt() + proj);
+        if (x_tau_vis <= 0 || x_tau_vis > 1) return std::numeric_limits<double>::quiet_NaN();
+
+        const double m_vis = (ve + vmu).M();
+        return m_vis / std::sqrt(x_tau_vis);
     }
 
     // compute the transverse mass, mode=0 for e and 1 for mu
