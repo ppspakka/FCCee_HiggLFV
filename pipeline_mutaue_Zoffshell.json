@@ -17,10 +17,15 @@
 
     "_comment4": "==== MET cuts ====",
     "max_dphi_e_met": 0.7,
-    "max_dphi_mu_met": 0.7
+    "max_dphi_mu_met": 0.7,
+
+    "_comment5": "==== Recoil mass cuts ====",
+    "recoil_mass_min": 150.0
   },
   "selections": [
     { "name": "lepton_selection",       "enabled": true },
+
+    { "name": "recoil_mass_selection",  "enabled": true },
 
     { "name": "z_candidate_selection",  "enabled": true },
     { "name": "Z_to_ll",                "enabled": false },

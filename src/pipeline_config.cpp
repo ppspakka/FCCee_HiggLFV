@@ -32,6 +32,8 @@ std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
     // if (key == "met_dphi" || key == "met-dphi" || key == "metdphi") return std::make_unique<METDphiSelection>();
     if (key == "met_e_dphi" || key == "metedphi" || key == "met_e-dphi") return std::make_unique<METEDphiSelection>();
     if (key == "met_mu_dphi" || key == "metmudphi" || key == "met_mu-dphi") return std::make_unique<METMuDphiSelection>();
+
+    if (key == "recoil_mass_selection" || key == "recoilmass_selection" || key == "recoil-mass-selection") return std::make_unique<RecoilMassSelection>();
     return nullptr;
 }
 
@@ -249,6 +251,18 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
     vars.push_back({
         "h_mu_dz", "|DZ(#mu)| (Unknow unit);|DZ(#mu)| [Unknow Unit];Events", 100, 0.0, 0.5,
         [](const Event&, const Meta& m) -> double { return m.h_mu_dz; }
+    });
+
+    // Recoil mass related variables
+    // highest recoil mass pair
+    vars.push_back({
+        "recoil_mass_1", "Recoil mass 1 (GeV);M_{recoil 1} [GeV];Events", 200, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_recoil1; }
+    });
+    // second highest recoil mass pair
+    vars.push_back({
+        "recoil_mass_2", "Recoil mass 2 (GeV);M_{recoil 2} [GeV];Events", 200, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_recoil2; }
     });
 
     return vars;

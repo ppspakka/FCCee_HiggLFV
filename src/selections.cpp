@@ -18,33 +18,6 @@ namespace {
         return std::abs(v1.DeltaPhi(v2));
     }
 
-    // // compute collinear mass for mu + e using missing ET (returns NaN if no MissingET)
-    // static double computeCollinearMassMuTauE(const Event& evt, int idx_mu, int idx_e) {
-    //     if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
-    //     TLorentzVector vmu, ve;
-    //     vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
-    //     ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
-    //     double px_miss = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
-    //     double py_miss = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
-    //     double pz_miss = (ve.Pz()/ve.Pt()) * std::sqrt(px_miss*px_miss + py_miss*py_miss);
-    //     double e_miss = std::sqrt(px_miss*px_miss + py_miss*py_miss + pz_miss*pz_miss);
-    //     TLorentzVector vmiss;
-    //     vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
-    //     return (vmu + ve + vmiss).M();
-    // }
-    // static double computeCollinearMassETauMu(const Event& evt, int idx_e, int idx_mu) {
-    //     if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
-    //     TLorentzVector ve, vmu;
-    //     ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
-    //     vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
-    //     double px_miss = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
-    //     double py_miss = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
-    //     double pz_miss = (vmu.Pz()/vmu.Pt()) * std::sqrt(px_miss*px_miss + py_miss*py_miss);
-    //     double e_miss = std::sqrt(px_miss*px_miss + py_miss*py_miss + pz_miss*pz_miss);
-    //     TLorentzVector vmiss;
-    //     vmiss.SetPxPyPzE(px_miss, py_miss, pz_miss, e_miss);
-    //     return (vmu + ve + vmiss).M();
-    // }
     static double computeCollinearMassMuTauE(const Event& evt, int idx_mu, int idx_e) {
         if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
 
@@ -124,6 +97,22 @@ namespace {
         v1.SetPtEtaPhiM(1.0, eta1, phi1, mass1);
         v2.SetPtEtaPhiM(1.0, eta2, phi2, mass2);
         return v1.DeltaR(v2);
+    }
+
+    //compute recoil mass given two leptons objects
+    static double computeRecoilMass(const Event& evt, int idx_l1, int idx_l2, int flav_l1, int flav_l2) {
+        if (!evt.d)
+            return std::numeric_limits<double>::quiet_NaN();
+        TLorentzVector vl1, vl2, vcm;
+        double mass_l1 = (flav_l1 == 0) ? Me : Mmu; // flavor: 0=e,1=mu
+        double mass_l2 = (flav_l2 == 0) ? Me : Mmu;
+        vl1.SetPtEtaPhiM(evt.d->Electron_PT[idx_l1], evt.d->Electron_Eta[idx_l1], evt.d->Electron_Phi[idx_l1], mass_l1);
+        vl2.SetPtEtaPhiM(evt.d->Electron_PT[idx_l2], evt.d->Electron_Eta[idx_l2], evt.d->Electron_Phi[idx_l2], mass_l2);
+        // center of mass energy at FCC-ee ZH threshold
+        const double E_cm = 240.0; // GeV
+        vcm.SetPxPyPzE(0.0, 0.0, 0.0, E_cm);
+        TLorentzVector v_recoil = vcm - (vl1 + vl2);
+        return v_recoil.M();
     }
 } // anonymous namespace
 
@@ -208,22 +197,64 @@ bool LeptonSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg)
         // 1 mu + 3 e
         meta.l1flavor = 1;
         meta.l1_index = selected_muons[0].index;
-        // sort electrons by pT descending
-        std::sort(selected_electrons.begin(), selected_electrons.end(),
+        // // sort electrons by pT descending
+        // std::sort(selected_electrons.begin(), selected_electrons.end(),
+        //           [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
+        // meta.l2flavor = 0; meta.l2_index = selected_electrons[0].index;
+        // meta.l3flavor = 0; meta.l3_index = selected_electrons[1].index;
+        // meta.l4flavor = 0; meta.l4_index = selected_electrons[2].index;
+
+        // e with the same sign as mu -> l2 (z boson candidate)
+        // other sorted by pT -> l3, l4
+        std::vector<Lepton> same_sign_electrons;
+        std::vector<Lepton> opp_sign_electrons;
+        for (const auto& ele : selected_electrons) {
+            if (ele.charge == selected_muons[0].charge) {
+                same_sign_electrons.push_back(ele);
+            } else {
+                opp_sign_electrons.push_back(ele);
+            }
+        }
+        if (same_sign_electrons.size() != 1 || opp_sign_electrons.size() != 2) {
+            return false; // should not happen due to net charge check
+        }
+        meta.l2flavor = 0; meta.l2_index = same_sign_electrons[0].index;
+        // sort opp_sign_electrons by pT descending
+        std::sort(opp_sign_electrons.begin(), opp_sign_electrons.end(),
                   [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
-        meta.l2flavor = 0; meta.l2_index = selected_electrons[0].index;
-        meta.l3flavor = 0; meta.l3_index = selected_electrons[1].index;
-        meta.l4flavor = 0; meta.l4_index = selected_electrons[2].index;
+        meta.l3flavor = 0; meta.l3_index = opp_sign_electrons[0].index;
+        meta.l4flavor = 0; meta.l4_index = opp_sign_electrons[1].index;
     } else {
         // 1 e + 3 mu
         meta.l1flavor = 0;
         meta.l1_index = selected_electrons[0].index;
-        // sort muons by pT descending
-        std::sort(selected_muons.begin(), selected_muons.end(),
+        // // sort muons by pT descending
+        // std::sort(selected_muons.begin(), selected_muons.end(),
+        //           [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
+        // meta.l2flavor = 1; meta.l2_index = selected_muons[0].index;
+        // meta.l3flavor = 1; meta.l3_index = selected_muons[1].index;
+        // meta.l4flavor = 1; meta.l4_index = selected_muons[2].index;
+
+        // mu with the same sign as e -> l2 (z boson candidate)
+        // other sorted by pT -> l3, l4
+        std::vector<Lepton> same_sign_muons;
+        std::vector<Lepton> opp_sign_muons;
+        for (const auto& mu : selected_muons) {
+            if (mu.charge == selected_electrons[0].charge) {
+                same_sign_muons.push_back(mu);
+            } else {
+                opp_sign_muons.push_back(mu);
+            }
+        }
+        if (same_sign_muons.size() != 1 || opp_sign_muons.size() != 2) {
+            return false; // should not happen due to net charge check
+        }
+        meta.l2flavor = 1; meta.l2_index = same_sign_muons[0].index;
+        // sort opp_sign_muons by pT descending
+        std::sort(opp_sign_muons.begin(), opp_sign_muons.end(),
                   [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
-        meta.l2flavor = 1; meta.l2_index = selected_muons[0].index;
-        meta.l3flavor = 1; meta.l3_index = selected_muons[1].index;
-        meta.l4flavor = 1; meta.l4_index = selected_muons[2].index;
+        meta.l3flavor = 1; meta.l3_index = opp_sign_muons[0].index;
+        meta.l4flavor = 1; meta.l4_index = opp_sign_muons[1].index;
     }
     return true;
 }
@@ -701,5 +732,32 @@ bool METMuDphiSelection::apply(const Event& evt, Meta& meta, const Parameters& c
     return meta.dphi_mu_met < cfg.max_dphi_mu_met;
 }
 
-} // namespace hlfv
+// Alternative selections for the offshell z boson, using recoil mass
+// require recoil mass to be > recoil_mass_min
+// l1 = H candidate lepton
+// l2 = Z candidate lepton 1
+// using l3 and l4, there are two possible matching to form Z boson
+// for analysis, choose the highest recoil pair -> plot recoil_mass_1
+// alternative pair -> recoil_mass_2
+std::string RecoilMassSelection::name() const { return "RecoilMassSelection"; }
+bool RecoilMassSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
+    if (!evt.d) return false;
 
+    // just plot and return true for analysis
+    // use function computeRecoilMass(event, l1_index, l2_index, flavor1, flavor2), flavor: 0=e,1=mu
+    // pair l2+l3
+    double recoil_mass_l2l3 = computeRecoilMass(evt, meta.l1_index, meta.l2_index,
+                                                        meta.l1flavor, meta.l2flavor);
+    // pair l2+l4
+    double recoil_mass_l2l4 = computeRecoilMass(evt, meta.l1_index, meta.l3_index,
+                                                        meta.l1flavor, meta.l3flavor);
+    // store higher as recoil_mass_1, lower as recoil_mass_2
+    if (recoil_mass_l2l3 >= recoil_mass_l2l4) {
+        meta.m_recoil1 = recoil_mass_l2l3;
+        meta.m_recoil2 = recoil_mass_l2l4;
+    } else {
+        meta.m_recoil1 = recoil_mass_l2l4;
+        meta.m_recoil2 = recoil_mass_l2l3;
+    }
+    return true;
+} // namespace hlfv

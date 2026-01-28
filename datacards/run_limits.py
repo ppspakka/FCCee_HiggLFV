@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 # Defaults
-DEFAULT_LUMI = "1"
+DEFAULT_LUMI = "5"
 DEFAULT_SEED = "1"
 # DEFAULT_QUANTILES = ["0.5"]  # For testing (only 0.5)
 DEFAULT_QUANTILES = ["0.5", "0.84", "0.16", "0.975", "0.025"]

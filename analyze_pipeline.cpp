@@ -49,6 +49,13 @@ void analyze_pipeline(const char* inputPath = "samples/HMuTauE_LFV_125.root",
     }
     for (auto& f : files) chain->Add(f);
 
+    // print list of files
+    printf("Input files:\n");
+    for (auto& f : files) {
+        printf("  %s\n", f.Data());
+    }
+    printf("Total files: %zu\n", files.size());
+
     // Bind Delphes class and enable only needed branches
     Delphes* delphes = new Delphes(chain);
     chain->SetBranchStatus("*", 0);

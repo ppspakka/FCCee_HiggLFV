@@ -377,7 +377,7 @@ def plot_target_histogram(signal, background, histname,
     # CMS-style label
     try:
         title = custom_title if custom_title is not None else histname
-        hep.cms.label(exp=None, llabel=title + " , Preliminary", rlabel=lumi_label)
+        hep.cms.label(exp=None, llabel=title, rlabel=lumi_label)
     except Exception:
         pass
 
@@ -604,7 +604,10 @@ def plot_brazil_limits(data: Any,
                        title: Optional[str] = None,
                        xlabel: str = "Mass (GeV)",
                        ylabel: str = "Upper limit",
+                       yscale: str = "linear",
                        show: bool = True,
+                       rlabel: str = "1 ab$^{-1}$ ($\\sqrt{s} = 240$ GeV)",
+                       llabel: Optional[str] = "Fast Simulation",
                        color_median: str = "black"):
     """Plot 'Brazil' style expected-limit bands. Accepts several input formats (see docstring in notebook)."""
     import numpy as _np
@@ -685,37 +688,37 @@ def plot_brazil_limits(data: Any,
 
     if ax is None:
         fig, ax = _plt.subplots(figsize=(10, 8))
-
+    yellow_code = '#ffcc01'
+    green_code = '#3cc808'
     if xs.size == 1:
         m = xs[0]
         x_left = m - mass_width
         x_right = m + mass_width
         if not _np.isnan(up2) and not _np.isnan(down2):
             ax.fill_between([x_left, x_right], [down2[0], down2[0]], [up2[0], up2[0]],
-                            color="yellow", edgecolor="none", label=r"$\pm2\sigma$ (expected)", alpha=0.9)
+                            color=yellow_code, edgecolor="none", label=r"$\pm2\sigma$", alpha=0.9)
         if not _np.isnan(up1) and not _np.isnan(down1):
             ax.fill_between([x_left, x_right], [down1[0], down1[0]], [up1[0], up1[0]],
-                            color="green", edgecolor="none", label=r"$\pm1\sigma$ (expected)", alpha=0.9)
+                            color=green_code, edgecolor="none", label=r"$\pm1\sigma$", alpha=0.9)
         if not _np.isnan(medians[0]):
             ax.hlines(medians[0], x_left, x_right, colors=color_median, linewidth=2, label="median expected")
             ax.plot(m, medians[0], marker="o", color=color_median)
     else:
         if _np.any(~_np.isnan(up2)) and _np.any(~_np.isnan(down2)):
             ax.fill_between(xs, down2, up2, where=~(_np.isnan(down2) | _np.isnan(up2)),
-                            color="yellow", edgecolor="none", label=r"$\pm2\sigma$ (expected)", alpha=0.9, interpolate=True)
+                            color=yellow_code, edgecolor="none", label=r"$\pm2\sigma$", alpha=0.9, interpolate=True)
         if _np.any(~_np.isnan(up1)) and _np.any(~_np.isnan(down1)):
             ax.fill_between(xs, down1, up1, where=~(_np.isnan(down1) | _np.isnan(up1)),
-                            color="green", edgecolor="none", label=r"$\pm1\sigma$ (expected)", alpha=0.9, interpolate=True)
+                            color=green_code, edgecolor="none", label=r"$\pm1\sigma$", alpha=0.9, interpolate=True)
         if not _np.all(_np.isnan(medians)):
             ax.plot(xs, medians, color=color_median, linestyle="-", linewidth=1, label="median expected")
             ax.plot(xs, medians, "o", color=color_median)
-
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    hep.cms.label(exp="", llabel="Fast Simulation", rlabel="1 ab$^{-1}$ ($\\sqrt{s} = 240$ GeV)")
+    hep.cms.label(exp="", llabel=llabel, rlabel=rlabel)
     xmin = float(_np.min(xs) - mass_width * 2)
     xmax = float(_np.max(xs) + mass_width * 2)
-    ax.set_xlim(xmin, xmax)
+    # ax.set_xlim(xmin, xmax)
 
     yvals = []
     for Larr in (medians, up1, up2, down1, down2):

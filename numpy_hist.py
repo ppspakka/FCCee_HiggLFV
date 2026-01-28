@@ -222,6 +222,21 @@ class NumpyHist1D:
             y_title=self._yaxis.GetTitle()
         )
         return merged_hist
+    
+    def FindBin(self, x: float) -> int:
+        return self._xaxis.FindBin(x)
+    
+    def Integral(self, bin_start: int = 1, bin_end: int | None = None) -> float:
+        nb = self.GetNbinsX()
+        if bin_end is None:
+            bin_end = nb
+        if bin_start < 1:
+            bin_start = 1
+        if bin_end > nb:
+            bin_end = nb
+        if bin_start > bin_end:
+            return 0.0
+        return float(np.sum(self._contents[bin_start - 1:bin_end]))
 
     # Convenience accessors
     @property

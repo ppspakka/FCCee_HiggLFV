@@ -43,11 +43,26 @@ ETAUMU_OFFSHELL_DIR = None
 
 # Backgrounds
 BACKGROUNDS = [
-    "/work/project/physics/psriling/FCC/FCCee/ZWW/ZWW.root",
     # "/work/project/physics/psriling/FCC/FCCee/HZFourLepton/HZFourLep.root", # Unused
-    "/work/project/physics/psriling/FCC/FCCee/zh_ll_ww/zh_ll_ww.root",
-    "/work/project/physics/psriling/FCC/FCCee/zh_ll_tautau/zh_ll_tautau.root",
-    "/work/project/physics/psriling/FCC/FCCee/zz_ll_tautau/zz_ll_tautau.root",
+    # "/work/project/physics/psriling/FCC/FCCee/ZWW/ZWW.root",
+    # "/work/project/physics/psriling/FCC/FCCee/zh_ll_ww/zh_ll_ww.root",
+    # "/work/project/physics/psriling/FCC/FCCee/zh_ll_tautau/zh_ll_tautau.root",
+    # "/work/project/physics/psriling/FCC/FCCee/zz_ll_tautau/zz_ll_tautau.root",
+    
+    # ISR samples
+    "/work/project/physics/psriling/FCC/FCCee/ISR_zh_ll_ww/ROOT/",
+    "/work/project/physics/psriling/FCC/FCCee/ISR_zh_ll_tautau/ROOT/",
+    "/work/project/physics/psriling/FCC/FCCee/ISR_zz_ll_tautau/ROOT/",
+    "/work/project/physics/psriling/FCC/FCCee/ISR_zww/ROOT/",
+    "/work/project/physics/psriling/FCC/FCCee/ISR_vbs/ROOT/"
+]
+BACKGROUNDS_NAMES = [
+    # "HZFourLep",  # Unused
+    "zh_ll_ww",
+    "zh_ll_tautau",
+    "zz_ll_tautau",
+    "zww",
+    "vbs"
 ]
 
 # Toggle which channels / types to include (set True/False)
@@ -77,13 +92,31 @@ class Job:
     pipeline: str
     sample_type: str  # "signal" or "background"
     channel: str      # e.g. "mutaue", "etaumu", ...
+    name: str = None         # process name
 
     def out_root(self) -> Path:
-        filename = Path(self.input_path).name
-        return self.output_dir / f"{self.sample_type}_{filename}"
+        if self.sample_type == "signal":
+            base_name = Path(self.input_path).stem if self.name is None else self.name
+            return self.output_dir / f"{base_name}.root"
+        elif self.sample_type == "background":
+            idx = BACKGROUNDS.index(self.input_path)
+            bg_name = BACKGROUNDS_NAMES[idx]
+            return self.output_dir / f"{self.sample_type}_{bg_name}.root"
+        else:
+            raise ValueError(f"Unknown sample_type: {self.sample_type}")
 
     def log_path(self) -> Path:
-        return self.output_dir / f"{self.sample_type}_{Path(self.input_path).name}.txt"
+        # return self.output_dir / f"{self.sample_type}_{Path(self.input_path).name}.txt"
+        # Use name if provided
+        if self.sample_type == "signal":
+            base_name = Path(self.input_path).stem if self.name is None else self.name
+            return self.output_dir / f"{base_name}.log"
+        elif self.sample_type == "background":
+            idx = BACKGROUNDS.index(self.input_path)
+            bg_name = BACKGROUNDS_NAMES[idx]
+            return self.output_dir / f"{self.sample_type}_{bg_name}.log"
+        else:
+            raise ValueError(f"Unknown sample_type: {self.sample_type}")
 
     def command(self) -> List[str]:
         # root expects the analyze_pipeline.cpp(...) as a single argument
@@ -101,47 +134,48 @@ def build_jobs() -> List[Job]:
 
     # MuTauE signals
     if CONFIG["mutaue_signal"]:
-        for mass in range(110, 161, 5):
-            inp = f"/work/project/physics/psriling/FCC/FCCee/HMuTauE_LFV/Hmass{mass}/HMuTauE_LFV_{mass}.root"
+        for mass in range(110, 146, 5):
+            inp = f"/work/project/physics/psriling/FCC/FCCee/ISR_HMuTauE_LFV/Hmass{mass}/ROOT/"
             jobs.append(Job(input_path=inp, output_dir=MUTAUE_DIR, pipeline=MUTAUE_PIPELINE,
-                            sample_type="signal", channel="mutaue"))
+                            sample_type="signal", channel="mutaue", name=f"signal_HMuTauE_LFV_{mass}"))
+        
     if CONFIG["mutaue_background"]:
         for bg in BACKGROUNDS:
             jobs.append(Job(input_path=bg, output_dir=MUTAUE_DIR, pipeline=MUTAUE_PIPELINE,
-                            sample_type="background", channel="mutaue"))
+                            sample_type="background", channel="mutaue", name=BACKGROUNDS_NAMES[BACKGROUNDS.index(bg)]))
 
     # Etaumu signals
     if CONFIG["etaumu_signal"]:
-        for mass in range(110, 161, 5):
-            inp = f"/work/project/physics/psriling/FCC/FCCee/HETauMu_LFV/Hmass{mass}/HETauMu_LFV_{mass}.root"
+        for mass in range(110, 146, 5):
+            inp = f"/work/project/physics/psriling/FCC/FCCee/ISR_HETauMu_LFV/Hmass{mass}/ROOT/"
             jobs.append(Job(input_path=inp, output_dir=ETAUMU_DIR, pipeline=ETAUMU_PIPELINE,
-                            sample_type="signal", channel="etaumu"))
+                            sample_type="signal", channel="etaumu", name=f"signal_HETauMu_LFV_{mass}"))
     if CONFIG["etaumu_background"]:
         for bg in BACKGROUNDS:
             jobs.append(Job(input_path=bg, output_dir=ETAUMU_DIR, pipeline=ETAUMU_PIPELINE,
-                            sample_type="background", channel="etaumu"))
+                            sample_type="background", channel="etaumu", name=BACKGROUNDS_NAMES[BACKGROUNDS.index(bg)]))
 
     # MuTauE Offshell
     if CONFIG["mutaue_offshell_signal"]:
         for mass in range(150, 161, 5):
-            inp = f"/work/project/physics/psriling/FCC/FCCee/HMuTauE_LFV/Hmass{mass}/HMuTauE_LFV_{mass}.root"
+            inp = f"/work/project/physics/psriling/FCC/FCCee/ISR_HMuTauE_LFV/Hmass{mass}/ROOT/"
             jobs.append(Job(input_path=inp, output_dir=MUTAUE_OFFSHELL_DIR, pipeline=MUTAUE_OFFSHELL_PIPELINE,
-                            sample_type="signal", channel="mutaue_offshell"))
+                            sample_type="signal", channel="mutaue_offshell", name=f"signal_HMuTauE_LFV_{mass}"))
     if CONFIG["mutaue_offshell_background"]:
         for bg in BACKGROUNDS:
             jobs.append(Job(input_path=bg, output_dir=MUTAUE_OFFSHELL_DIR, pipeline=MUTAUE_OFFSHELL_PIPELINE,
-                            sample_type="background", channel="mutaue_offshell"))
+                            sample_type="background", channel="mutaue_offshell", name=BACKGROUNDS_NAMES[BACKGROUNDS.index(bg)]))
 
     # Etaumu Offshell
     if CONFIG["etaumu_offshell_signal"]:
         for mass in range(150, 161, 5):
-            inp = f"/work/project/physics/psriling/FCC/FCCee/HETauMu_LFV/Hmass{mass}/HETauMu_LFV_{mass}.root"
+            inp = f"/work/project/physics/psriling/FCC/FCCee/ISR_HETauMu_LFV/Hmass{mass}/ROOT/"
             jobs.append(Job(input_path=inp, output_dir=ETAUMU_OFFSHELL_DIR, pipeline=ETAUMU_OFFSHELL_PIPELINE,
-                            sample_type="signal", channel="etaumu_offshell"))
+                            sample_type="signal", channel="etaumu_offshell", name=f"signal_HETauMu_LFV_{mass}"))
     if CONFIG["etaumu_offshell_background"]:
         for bg in BACKGROUNDS:
             jobs.append(Job(input_path=bg, output_dir=ETAUMU_OFFSHELL_DIR, pipeline=ETAUMU_OFFSHELL_PIPELINE,
-                            sample_type="background", channel="etaumu_offshell"))
+                            sample_type="background", channel="etaumu_offshell", name=BACKGROUNDS_NAMES[BACKGROUNDS.index(bg)]))
 
     return jobs
 

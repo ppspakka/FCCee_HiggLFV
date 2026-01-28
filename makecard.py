@@ -23,7 +23,16 @@ DEFAULT_INITIAL_HIST_NAME = "00_Initial_n_muons"
 DEFAULT_FINAL_HIST_REGEX = r"^\d+_finalstate_nocut_m_collinear$"
 
 # Cross-sections in pb
-signal_xsec = 1 / 1e6 * 0.17  # 1 ab -> 0.17 events
+# signal_xsec = 1 / 1e6 # 1 ab for sigma(ee->ZH) x BR(H->LFV) = 1 ab (assumed)
+signal_xsec = 1000 / 1e6 # 1 fb for sigma(ee->ZH) x BR(H->LFV) = 1 ab (assumed)
+factors = {
+    'ZToLL': 0.03363 * 2,  # Z->ee + Z->mumu
+    'TauToLep': 0.1782 * 1,  # tau->e + tau->mu (consider opposite flavor only)
+}
+
+for key in factors:
+    signal_xsec *= factors[key]
+
 cross_sections_pb = {
     'HMuTauE_LFV_110': signal_xsec,
     'HMuTauE_LFV_115': signal_xsec,
@@ -50,11 +59,17 @@ cross_sections_pb = {
     'HETauMu_LFV_160': signal_xsec,
     
 
-    'ZWW': 2.79708716e-06,          # Z->ll, W->lvlv
+    # 'ZWW': 2.79708716e-06,          # Z->ll, W->lvlv
     # 'HZFourLep': 2.714e-06,         # Z->ll, H->WW, WW->lvlv
-    'zz_ll_tautau': 1.52e-04,      # Z->ll, Z->tautau
-    'zh_ll_ww': 7.84e-05 / 2,           # Z->ll, H->WW, WW->lvlv (only one mu and one e)
-    'zh_ll_tautau': 2.19e-05 / 2,       # Z->ll, H->tautau, tautau->muon+e # Test suppress zh by 50%
+    # 'zz_ll_tautau': 1.52e-04,      # Z->ll, Z->tautau, tau -> muons/electrons
+    # 'zh_ll_ww': 7.84e-05,           # Z->ll, H->WW, WW->lvlv (only one mu and one e)
+    # 'zh_ll_tautau': 2.19e-05,       # Z->ll, H->tautau, tautau->muons/electrons
+    
+    'zz_ll_tautau': 5.79e-04,      # Z->ll, Z->tautau, tau -> muons/electrons (corrected + ISR)
+    'zh_ll_ww': 6.6e-05,           # Z->ll, H->WW, WW->lvlv (only one mu and one e) + ISR
+    'zh_ll_tautau': 7.39611e-05,       # Z->ll, H->tautau, tautau->muons/electrons (corrected + ISR)
+    'zww': 3.53e-06,          # Z->ll, W->lvlv + ISR
+    'vbs': 3.91e-06,          # vector boson scattering + ISR
 }
 
 # Uncertainties framework (editable)
@@ -93,7 +108,10 @@ UNCERTAINTIES = {
         "zh_ll_tautau": 1.3,
     },
     "zww" : {
-        "ZWW": 1.3,
+        "zww": 1.3,
+    },
+    "vbs" : {
+        "vbs": 1.3,
     },
 }
 

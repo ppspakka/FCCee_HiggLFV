@@ -20,6 +20,9 @@ struct Parameters {
     // MET selection
     double max_dphi_e_met;
     double max_dphi_mu_met;
+
+    // Recoil mass selection
+    double recoil_mass_min;
 };
 
 struct Event {
@@ -60,6 +63,8 @@ struct Meta {
     double m_transverse_mu = std::numeric_limits<double>::quiet_NaN();
     // recoil mass
     double m_recoil = std::numeric_limits<double>::quiet_NaN();
+    double m_recoil1 = std::numeric_limits<double>::quiet_NaN();
+    double m_recoil2 = std::numeric_limits<double>::quiet_NaN();
 
     double deltaR_mu_e = std::numeric_limits<double>::quiet_NaN();
 
