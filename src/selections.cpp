@@ -753,11 +753,11 @@ bool RecoilMassSelection::apply(const Event& evt, Meta& meta, const Parameters& 
     // just plot and return true for analysis
     // use function computeRecoilMass(event, l1_index, l2_index, flavor1, flavor2), flavor: 0=e,1=mu
     // pair l2+l3
-    double recoil_mass_l2l3 = computeRecoilMass(evt, meta.l1_index, meta.l2_index,
-                                                        meta.l1flavor, meta.l2flavor);
+    double recoil_mass_l2l3 = computeRecoilMass(evt, meta.l2_index, meta.l3_index,
+                                                        meta.l2flavor, meta.l3flavor);
     // pair l2+l4
-    double recoil_mass_l2l4 = computeRecoilMass(evt, meta.l1_index, meta.l3_index,
-                                                        meta.l1flavor, meta.l3flavor);
+    double recoil_mass_l2l4 = computeRecoilMass(evt, meta.l2_index, meta.l4_index,
+                                                        meta.l2flavor, meta.l4flavor);
     // store higher as recoil_mass_1, lower as recoil_mass_2
     if (recoil_mass_l2l3 >= recoil_mass_l2l4) {
         meta.m_recoil1 = recoil_mass_l2l3;
@@ -766,7 +766,27 @@ bool RecoilMassSelection::apply(const Event& evt, Meta& meta, const Parameters& 
         meta.m_recoil1 = recoil_mass_l2l4;
         meta.m_recoil2 = recoil_mass_l2l3;
     }
-    return true;
+    // return true;
+
+    // apply selection
+    // Approach 1: require m_recoil_1 > recoil_mass_min, choose highest pair as Z candidate
+    if (meta.m_recoil1 > cfg.recoil_mass_min) {
+        // choose the pair corresponding to m_recoil1 as Z candidate
+        if (meta.m_recoil1 == recoil_mass_l2l3) {
+            // l2+l3
+            meta.z_l1 = meta.l2_index;
+            meta.z_l2 = meta.l3_index;
+        } else {
+            // l2+l4
+            meta.z_l1 = meta.l2_index;
+            meta.z_l2 = meta.l4_index;
+        }
+        return true;
+    }
+    return false;
+    
+
+    // Approach 2: require m_recoil_1 > recoil_mass_min, if both m_recoil_1 and m_recoil_2 > recoil_mass_min, reject event
 }
 
 } // namespace hlfv
