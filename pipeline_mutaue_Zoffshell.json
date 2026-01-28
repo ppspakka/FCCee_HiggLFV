@@ -20,7 +20,7 @@
     "max_dphi_mu_met": 0.7,
 
     "_comment5": "==== Recoil mass cuts ====",
-    "recoil_mass_min": 150.0
+    "recoil_mass_min": 145.0
   },
   "selections": [
     { "name": "lepton_selection",       "enabled": true },
