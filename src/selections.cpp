@@ -104,10 +104,17 @@ namespace {
         if (!evt.d)
             return std::numeric_limits<double>::quiet_NaN();
         TLorentzVector vl1, vl2, vcm;
-        double mass_l1 = (flav_l1 == 0) ? Me : Mmu; // flavor: 0=e,1=mu
-        double mass_l2 = (flav_l2 == 0) ? Me : Mmu;
-        vl1.SetPtEtaPhiM(evt.d->Electron_PT[idx_l1], evt.d->Electron_Eta[idx_l1], evt.d->Electron_Phi[idx_l1], mass_l1);
-        vl2.SetPtEtaPhiM(evt.d->Electron_PT[idx_l2], evt.d->Electron_Eta[idx_l2], evt.d->Electron_Phi[idx_l2], mass_l2);
+        // if flav=0 -> electron, flav=1 -> muon
+        if (flav_l1 == 0) {
+            vl1.SetPtEtaPhiM(evt.d->Electron_PT[idx_l1], evt.d->Electron_Eta[idx_l1], evt.d->Electron_Phi[idx_l1], Me);
+        } else {
+            vl1.SetPtEtaPhiM(evt.d->Muon_PT[idx_l1], evt.d->Muon_Eta[idx_l1], evt.d->Muon_Phi[idx_l1], Mmu);
+        }
+        if (flav_l2 == 0) {
+            vl2.SetPtEtaPhiM(evt.d->Electron_PT[idx_l2], evt.d->Electron_Eta[idx_l2], evt.d->Electron_Phi[idx_l2], Me);
+        } else {
+            vl2.SetPtEtaPhiM(evt.d->Muon_PT[idx_l2], evt.d->Muon_Eta[idx_l2], evt.d->Muon_Phi[idx_l2], Mmu);
+        }
         // center of mass energy at FCC-ee ZH threshold
         const double E_cm = 240.0; // GeV
         vcm.SetPxPyPzE(0.0, 0.0, 0.0, E_cm);
