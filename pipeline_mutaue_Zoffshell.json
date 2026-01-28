@@ -12,12 +12,12 @@
     "z_mass_window_lower": 30.0,
 
     "_comment3": "==== H -> mu tau_e cuts ====",
-    "mu_pt_min": 30.0,
-    "e_pt_min": 20.0,
+    "mu_pt_min": 40.0,
+    "e_pt_min": 0.0,
 
     "_comment4": "==== MET cuts ====",
-    "max_dphi_e_met": 0.7,
-    "max_dphi_mu_met": 0.7,
+    "max_dphi_e_met": 0.1,
+    "max_dphi_mu_met": 0.1,
 
     "_comment5": "==== Recoil mass cuts ====",
     "recoil_mass_min": 145.0
