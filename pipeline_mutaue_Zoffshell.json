@@ -25,8 +25,6 @@
   "selections": [
     { "name": "lepton_selection",       "enabled": true },
 
-    { "name": "recoil_mass_selection",  "enabled": true },
-
     { "name": "z_candidate_selection",  "enabled": true },
     { "name": "Z_to_ll",                "enabled": false },
 
