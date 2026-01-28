@@ -772,15 +772,34 @@ bool RecoilMassSelection::apply(const Event& evt, Meta& meta, const Parameters& 
     // Approach 1: require m_recoil_1 > recoil_mass_min, choose highest pair as Z candidate
     if (meta.m_recoil1 > cfg.recoil_mass_min) {
         // choose the pair corresponding to m_recoil1 as Z candidate
-        if (meta.m_recoil1 == recoil_mass_l2l3) {
-            // l2+l3
-            meta.z_l1 = meta.l2_index;
-            meta.z_l2 = meta.l3_index;
-        } else {
-            // l2+l4
-            meta.z_l1 = meta.l2_index;
-            meta.z_l2 = meta.l4_index;
+        // l2+l3
+        meta.z_l1 = meta.l2_index;
+        meta.z_l2 = meta.l3_index;
+        // z mass, mass diff, z flavor
+        TLorentzVector l1, l2;
+        if (meta.l2flavor == 0) {
+            // electron
+            l1.SetPtEtaPhiM(evt.d->Electron_PT[meta.l2_index], evt.d->Electron_Eta[meta.l2_index],
+                            evt.d->Electron_Phi[meta.l2_index], Me);
+        } else if (meta.l2flavor == 1)
+        {
+            // muon
+            l1.SetPtEtaPhiM(evt.d->Muon_PT[meta.l2_index], evt.d->Muon_Eta[meta.l2_index],
+                            evt.d->Muon_Phi[meta.l2_index], Mmu);
         }
+        if (meta.l3flavor == 0) {
+            // electron
+            l2.SetPtEtaPhiM(evt.d->Electron_PT[meta.l3_index], evt.d->Electron_Eta[meta.l3_index],
+                            evt.d->Electron_Phi[meta.l3_index], Me);
+        } else if (meta.l3flavor == 1) {
+            // muon
+            l2.SetPtEtaPhiM(evt.d->Muon_PT[meta.l3_index], evt.d->Muon_Eta[meta.l3_index],
+                            evt.d->Muon_Phi[meta.l3_index], Mmu);
+        }
+        double z_mass = (l1 + l2).M();
+        meta.z_mass = z_mass;
+        meta.z_mass_diff = std::abs(z_mass - cfg.z_mass);
+        meta.z_flavor = meta.l2flavor; // same flavor for l2 and l3
         return true;
     }
     return false;
