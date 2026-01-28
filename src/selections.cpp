@@ -760,4 +760,6 @@ bool RecoilMassSelection::apply(const Event& evt, Meta& meta, const Parameters& 
         meta.m_recoil2 = recoil_mass_l2l3;
     }
     return true;
+}
+
 } // namespace hlfv
