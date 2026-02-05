@@ -156,11 +156,14 @@ void analyze_pipeline(const char* inputPath = "samples/HMuTauE_LFV_125.root",
     cutflowH.Write();
 
     fout->Close();
-
+    // for efficiency calculation
+    int initial = cutflow[0];
     printf("\n==== Pipeline summary ====\n");
     printf("Total events:          %lld\n", nEntries);
     for (size_t i = 0; i < cutflow.size(); ++i) {
-        printf("After %-16s %lld\n", stepNames[i].c_str(), cutflow[i]);
+        // calculate efficiency
+        double efficiency = static_cast<double>(cutflow[i]) / initial;
+        printf("After %-30s %lld (Efficiency: %.6f%%)\n", stepNames[i].c_str(), cutflow[i], efficiency * 100);
     }
     printf("Output written to: %s\n", outputPath);
     printf("===============================\n");
