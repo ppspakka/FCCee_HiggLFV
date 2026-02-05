@@ -3,11 +3,11 @@
     "_comment": "Configuration parameters for the selection cuts",
 
     "_comment1": "==== Lepton cuts ====",
-    "lepton_pt_min": 10.0,
+    "lepton_pt_min": 5.0,
 
     "_comment2": "==== Z -> ll cuts ====",
     "z_mass": 91.0,
-    "zl_pt_min": 10.0,
+    "zl_pt_min": 5.0,
     "z_mass_window_upper": 1.0,
     "z_mass_window_lower": 30.0,
 
@@ -17,17 +17,22 @@
 
     "_comment4": "==== MET cuts ====",
     "max_dphi_e_met": 0.1,
-    "max_dphi_mu_met": 0.1
+    "max_dphi_mu_met": 0.1,
+  
+    "_comment6": "==== H candidate selection mode ====",
+    "mode": 0,
+    "mcol_min": 145
   },
   "selections": [
     { "name": "lepton_selection",       "enabled": true },
 
-    { "name": "z_candidate_selection",  "enabled": true },
-    { "name": "Z_to_ll",                "enabled": false },
+    { "name": "z_candidate_selection",  "enabled": false },
+    { "name": "h_candidate_selection",  "enabled": true },
 
-    { "name": "H_to_etau_mu",           "enabled": true },
+    { "name": "H_to_mutau_e",           "enabled": true },
 
-    { "name": "MET_mu_dphi",            "enabled": true },
+    { "name": "MET_e_dphi",               "enabled": true },
+
     { "name": "finalstate_nocut",       "enabled": true }
   ]
 }

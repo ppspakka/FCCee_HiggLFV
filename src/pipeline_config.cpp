@@ -34,6 +34,8 @@ std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
     if (key == "met_mu_dphi" || key == "metmudphi" || key == "met_mu-dphi") return std::make_unique<METMuDphiSelection>();
 
     if (key == "recoil_mass_selection" || key == "recoilmass_selection" || key == "recoil-mass-selection") return std::make_unique<RecoilMassSelection>();
+
+    if (key == "h_candidate_selection" || key == "hcandidate_selection" || key == "h-candidate-selection") return std::make_unique<HCandidateSelection>();
     return nullptr;
 }
 
@@ -94,6 +96,9 @@ bool loadPipelineConfig(const std::string& filepath, PipelineConfig& out) {
         parseParam("e_pt_min", cfg.params.e_pt_min);
         parseParam("max_dphi_e_met", cfg.params.max_dphi_e_met);
         parseParam("max_dphi_mu_met", cfg.params.max_dphi_mu_met);
+        parseParam("mode", cfg.params.mode);
+        parseParam("mcol_min", cfg.params.mcol_min);
+
     }
 
     // selections array
@@ -263,6 +268,12 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
     vars.push_back({
         "recoil_mass_2", "Recoil mass 2 (GeV);M_{recoil 2} [GeV];Events", 200, 0.5, 200.5,
         [](const Event&, const Meta& m) -> double { return m.m_recoil2; }
+    });
+
+    // invariant mass of 3 objects (2l from H + MET)
+    vars.push_back({
+        "m_h_invariant", "Invariant mass of 3 objects (GeV);M_{H inv} [GeV];Events", 200, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_h_invariant; }
     });
 
     return vars;

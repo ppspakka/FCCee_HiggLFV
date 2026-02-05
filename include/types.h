@@ -23,6 +23,10 @@ struct Parameters {
 
     // Recoil mass selection
     double recoil_mass_min;
+
+    // H candidate selection mode: "mutaue" or "etamu"
+    double mode;
+    double mcol_min;
 };
 
 struct Event {
@@ -39,6 +43,9 @@ struct Meta {
     int l2_index = -1;
     int l3_index = -1;
     int l4_index = -1;
+
+    int otherZ_idx = -1;
+    int otherH_idx = -1;
 
     // Z candidate info (unset -> NaN / -1)
     int z_l1 = -1;
@@ -87,6 +94,9 @@ struct Meta {
     double beta_x = std::numeric_limits<double>::quiet_NaN();
     double beta_y = std::numeric_limits<double>::quiet_NaN();
     double beta_z = std::numeric_limits<double>::quiet_NaN();
+
+    // m_h reconstructed using invariant mass of 3 objects (2l from H + MET)
+    double m_h_invariant = std::numeric_limits<double>::quiet_NaN();
 };
 
 } // namespace hlfv

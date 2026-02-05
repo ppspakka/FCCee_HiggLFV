@@ -3,11 +3,11 @@
     "_comment": "Configuration parameters for the selection cuts",
 
     "_comment1": "==== Lepton cuts ====",
-    "lepton_pt_min": 10.0,
+    "lepton_pt_min": 5.0,
 
     "_comment2": "==== Z -> ll cuts ====",
     "z_mass": 91,
-    "zl_pt_min": 10.0,
+    "zl_pt_min": 5.0,
     "z_mass_window_upper": 5.0,
     "z_mass_window_lower": 5.0,
 

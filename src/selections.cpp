@@ -1,811 +1,579 @@
 #include "../include/selections.h"
 
 #include <cmath>
+#include <vector>
+#include <numeric>
+#include <algorithm>
 #include <TLorentzVector.h>
+#include <TVector3.h>
 
 namespace hlfv {
 
-constexpr double Me = 0.000511;
-constexpr double Mmu = 0.10565837;
+// --- Constants ---
+constexpr double MASS_E   = 0.000511;
+constexpr double MASS_MU  = 0.10565837;
+constexpr double ECM      = 240.0; // Center of mass energy
+constexpr double Z_MASS   = 91.1876;
 
-// helper functions extracted from selection logic
+enum Flavor { ELECTRON = 0, MUON = 1 };
+
+struct LeptonObj {
+    int index;
+    int flavor; 
+    double pt;
+    int charge;
+};
+
+// --- Helper Functions ---
 namespace {
-    // compute absolute delta phi between two phi angles using TLorentzVector::DeltaPhi
-    static double deltaPhiFromPhis(double phi1, double phi2) {
-        TLorentzVector v1, v2;
-        v1.SetPtEtaPhiM(1.0, 0.0, phi1, 0.0);
-        v2.SetPtEtaPhiM(1.0, 0.0, phi2, 0.0);
-        return std::abs(v1.DeltaPhi(v2));
-    }
 
-    static double computeCollinearMassMuTauE(const Event& evt, int idx_mu, int idx_e) {
-        if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
-
-        TLorentzVector vmu, ve;
-        vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
-        ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
-
-        if (ve.Pt() <= 0) return std::numeric_limits<double>::quiet_NaN();
-
-        const double met_px = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
-        const double met_py = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
-        const double dir_x = ve.Px() / ve.Pt();
-        const double dir_y = ve.Py() / ve.Pt();
-        const double proj = met_px * dir_x + met_py * dir_y;
-
-        if (proj <= 0) return std::numeric_limits<double>::quiet_NaN();
-
-        const double x_tau_vis = ve.Pt() / (ve.Pt() + proj);
-        if (x_tau_vis <= 0 || x_tau_vis > 1) return std::numeric_limits<double>::quiet_NaN();
-
-        const double m_vis = (vmu + ve).M();
-        return m_vis / std::sqrt(x_tau_vis);
-    }
-    static double computeCollinearMassETauMu(const Event& evt, int idx_e, int idx_mu) {
-        if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
-
-        TLorentzVector ve, vmu;
-        ve.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
-        vmu.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
-
-        if (vmu.Pt() <= 0) return std::numeric_limits<double>::quiet_NaN();
-
-        const double met_px = evt.d->MissingET_MET[0] * std::cos(evt.d->MissingET_Phi[0]);
-        const double met_py = evt.d->MissingET_MET[0] * std::sin(evt.d->MissingET_Phi[0]);
-        const double dir_x = vmu.Px() / vmu.Pt();
-        const double dir_y = vmu.Py() / vmu.Pt();
-        const double proj = met_px * dir_x + met_py * dir_y;
-
-        if (proj <= 0) return std::numeric_limits<double>::quiet_NaN();
-
-        const double x_tau_vis = vmu.Pt() / (vmu.Pt() + proj);
-        if (x_tau_vis <= 0 || x_tau_vis > 1) return std::numeric_limits<double>::quiet_NaN();
-
-        const double m_vis = (ve + vmu).M();
-        return m_vis / std::sqrt(x_tau_vis);
-    }
-
-    // compute the transverse mass, mode=0 for e and 1 for mu
-    static double computeTransverseMass(const Event& evt, int mode, int idx_lep) {
-        if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
-        double pt_lep = 0.0;
-        double phi_lep = 0.0;
-        if (mode == 0) {
-            // electron
-            pt_lep = evt.d->Electron_PT[idx_lep];
-            phi_lep = evt.d->Electron_Phi[idx_lep];
-        } else if (mode == 1) {
-            // muon
-            pt_lep = evt.d->Muon_PT[idx_lep];
-            phi_lep = evt.d->Muon_Phi[idx_lep];
+    // Generic P4 retriever
+    TLorentzVector get_p4(const Event& evt, int idx, int flavor) {
+        TLorentzVector v;
+        if (flavor == ELECTRON) {
+            v.SetPtEtaPhiM(evt.d->Electron_PT[idx], evt.d->Electron_Eta[idx], 
+                           evt.d->Electron_Phi[idx], MASS_E);
         } else {
-            return std::numeric_limits<double>::quiet_NaN();
+            v.SetPtEtaPhiM(evt.d->Muon_PT[idx], evt.d->Muon_Eta[idx], 
+                           evt.d->Muon_Phi[idx], MASS_MU);
         }
+        return v;
+    }
+
+    double delta_phi(double phi1, double phi2) {
+        double dphi = std::abs(phi1 - phi2);
+        if (dphi > M_PI) dphi = 2 * M_PI - dphi;
+        return dphi;
+    }
+
+    // Generic Collinear Mass Calculation
+    // Calculates mass of (visible_lep + invisible_tau_products)
+    // Assumes neutrinos go in direction of visible tau product (approx)
+    double compute_collinear_mass(const Event& evt, const TLorentzVector& v_tau_vis, const TLorentzVector& v_other) {
+        if (!evt.d || evt.d->MissingET_size <= 0) return std::numeric_limits<double>::quiet_NaN();
+        if (v_tau_vis.Pt() <= 0) return std::numeric_limits<double>::quiet_NaN();
+
         double met = evt.d->MissingET_MET[0];
-        double phi_met = evt.d->MissingET_Phi[0];
-        double delta_phi = deltaPhiFromPhis(phi_lep, phi_met);
-        return std::sqrt(2 * pt_lep * met * (1 - std::cos(delta_phi)));
+        double met_phi = evt.d->MissingET_Phi[0];
+        double met_px = met * std::cos(met_phi);
+        double met_py = met * std::sin(met_phi);
+
+        // Project MET onto the visible tau direction
+        double dir_x = v_tau_vis.Px() / v_tau_vis.Pt();
+        double dir_y = v_tau_vis.Py() / v_tau_vis.Pt();
+        double proj = met_px * dir_x + met_py * dir_y;
+
+        if (proj <= 0) return std::numeric_limits<double>::quiet_NaN();
+
+        // Visible fraction of tau momentum
+        double x_tau_vis = v_tau_vis.Pt() / (v_tau_vis.Pt() + proj);
+
+        if (x_tau_vis <= 0 || x_tau_vis > 1) return std::numeric_limits<double>::quiet_NaN();
+
+        double m_vis = (v_tau_vis + v_other).M();
+        return m_vis / std::sqrt(x_tau_vis);
     }
 
-    // compute DeltaR between two objects given their eta and phi
-    // input (flavor1, eta1, phi1), (flavor2, eta2, phi2)
-    static double computeDeltaR(int flav1, double eta1, double phi1,
-                                int flav2, double eta2, double phi2) {
-        TLorentzVector v1, v2;
-        double mass1 = (flav1 == 0) ? Me : Mmu;
-        double mass2 = (flav2 == 0) ? Me : Mmu;
-        v1.SetPtEtaPhiM(1.0, eta1, phi1, mass1);
-        v2.SetPtEtaPhiM(1.0, eta2, phi2, mass2);
-        return v1.DeltaR(v2);
+    double compute_transverse_mass(double pt, double phi, double met, double met_phi) {
+        double dphi = delta_phi(phi, met_phi);
+        return std::sqrt(2 * pt * met * (1 - std::cos(dphi)));
+    }
+// Post-calculation routine to compute recoil, alternative masses, and impact parameters
+    void compute_z_post_calculations(const Event& evt, Meta& meta, const Parameters& cfg) {
+        
+        // 1. Invariant Mass of the Selected Z (Case 1)
+        // Already computed as meta.z_mass, but we assign to m_z1 for consistency
+        meta.m_z1 = meta.z_mass;
+
+        // 2. Invariant Mass of the Alternative Pair (Case 2)
+        // Pair: Z_L1 (fixed L2) + The remaining OS lepton (other_idx)
+        if (meta.otherZ_idx != -1) {
+            TLorentzVector p4_z1 = get_p4(evt, meta.z_l1, meta.z_flavor);
+            TLorentzVector p4_other = get_p4(evt, meta.otherZ_idx, meta.z_flavor);
+            meta.m_z2 = (p4_z1 + p4_other).M();
+        }
+
+        // 3. Recoil Mass Calculation (against Beam)
+        // Based on the SELECTED Z candidate
+        TLorentzVector p4_z_selected = get_p4(evt, meta.z_l1, meta.z_flavor) + 
+                                       get_p4(evt, meta.z_l2, meta.z_flavor);
+
+        double beam_E = ECM / 2.0; 
+        TLorentzVector p_beam_total(0.0, 0.0, 0.0, ECM); // px, py, pz, E (approx for 0 crossing angle)
+        
+        TLorentzVector p_recoil = p_beam_total - p4_z_selected;
+        meta.m_recoil = p_recoil.M();
+
+        // 4. Boost Vectors (Recoil Frame)
+        TVector3 boost_vec = -p_recoil.BoostVector();
+        meta.beta_x = boost_vec.X();
+        meta.beta_y = boost_vec.Y();
+        meta.beta_z = boost_vec.Z();
+
+        // 5. Impact Parameters (D0/DZ) for Higgs Candidates
+        // The Higgs candidates are: 
+        //   A. L1 (The singleton, prompt lepton)
+        //   B. The 'other' lepton (The one NOT selected for Z)
+        
+        // Helper to set D0/DZ safely
+        auto set_d0dz = [&](int idx, int flavor) {
+            double d0 = (flavor == ELECTRON) ? evt.d->Electron_D0[idx] : evt.d->Muon_D0[idx];
+            double dz = (flavor == ELECTRON) ? evt.d->Electron_DZ[idx] : evt.d->Muon_DZ[idx];
+            
+            if (flavor == ELECTRON) {
+                meta.h_e_d0 = std::abs(d0);
+                meta.h_e_dz = std::abs(dz);
+            } else {
+                meta.h_mu_d0 = std::abs(d0);
+                meta.h_mu_dz = std::abs(dz);
+            }
+        };
+
+        // Set for L1 (Prompt)
+        set_d0dz(meta.l1_index, meta.l1flavor);
+
+        // Set for 'Other' (From Z triplet, but assigned to Higgs)
+        // This has the same flavor as the Z pair
+        if (meta.otherZ_idx != -1) {
+            set_d0dz(meta.otherZ_idx, meta.z_flavor);
+        }
+
+        // Collinear mass calculation
+        
+        // Higgs
+        if (meta.otherH_idx != -1) {
+            // 1. Calculate Correct Pair (h_e, h_mu)
+            TLorentzVector p4_e  = get_p4(evt, meta.h_e, ELECTRON);
+            TLorentzVector p4_mu = get_p4(evt, meta.h_mu, MUON);
+
+            // Lambda or simple ternary macro prevents repeating the mode logic twice
+            auto get_mass = [&](TLorentzVector& e, TLorentzVector& mu) {
+                return compute_collinear_mass(evt, 
+                    (cfg.mode == 0) ? mu : e,  // v_tau (mode 0: mu is tau)
+                    (cfg.mode == 0) ? e  : mu  // v_other
+                );
+            };
+
+            meta.m_h1 = get_mass(p4_e, p4_mu);
+
+            // 2. Calculate Incorrect Pair (Swap one index)
+            // Update the specific vector that corresponds to the "other" flavor
+            if (meta.l1flavor == MUON) p4_e  = get_p4(evt, meta.otherH_idx, ELECTRON);
+            else                       p4_mu = get_p4(evt, meta.otherH_idx, MUON);
+
+            meta.m_h2 = get_mass(p4_e, p4_mu);
+        }
+
+        // Z boson
+        if (meta.otherZ_idx != -1) {
+            TLorentzVector p4_z1 = get_p4(evt, meta.z_l1, meta.z_flavor);
+
+            // 1. Correct Pair
+            TLorentzVector p4_z2 = get_p4(evt, meta.z_l2, meta.z_flavor);
+            meta.m_z1 = (p4_z1 + p4_z2).M();
+
+            // 2. Incorrect Pair
+            TLorentzVector p4_other = get_p4(evt, meta.otherZ_idx, meta.z_flavor);
+            meta.m_z2 = (p4_z1 + p4_other).M();
+        }
+
     }
 
-    //compute recoil mass given two leptons objects
-    static double computeRecoilMass(const Event& evt, int idx_l1, int idx_l2, int flav_l1, int flav_l2) {
-        if (!evt.d)
-            return std::numeric_limits<double>::quiet_NaN();
-        TLorentzVector vl1, vl2, vcm;
-        // if flav=0 -> electron, flav=1 -> muon
-        if (flav_l1 == 0) {
-            vl1.SetPtEtaPhiM(evt.d->Electron_PT[idx_l1], evt.d->Electron_Eta[idx_l1], evt.d->Electron_Phi[idx_l1], Me);
-        } else {
-            vl1.SetPtEtaPhiM(evt.d->Muon_PT[idx_l1], evt.d->Muon_Eta[idx_l1], evt.d->Muon_Phi[idx_l1], Mmu);
-        }
-        if (flav_l2 == 0) {
-            vl2.SetPtEtaPhiM(evt.d->Electron_PT[idx_l2], evt.d->Electron_Eta[idx_l2], evt.d->Electron_Phi[idx_l2], Me);
-        } else {
-            vl2.SetPtEtaPhiM(evt.d->Muon_PT[idx_l2], evt.d->Muon_Eta[idx_l2], evt.d->Muon_Phi[idx_l2], Mmu);
-        }
-        // center of mass energy at FCC-ee ZH threshold
-        const double E_cm = 240.0; // GeV
-        vcm.SetPxPyPzE(0.0, 0.0, 0.0, E_cm);
-        TLorentzVector v_recoil = vcm - (vl1 + vl2);
-        return v_recoil.M();
-    }
 } // anonymous namespace
 
-// test add empty cut
+// --- Selections ---
+
 std::string EmptySelection::name() const { return "EmptySelection"; }
 bool EmptySelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
-    // Test add the Transverse mass < 2.0 GeV for the electron
+    // Example test
     if (meta.m_transverse_e >= 2.0) return false;
     return true;
 }
 
-// Final state: no cut applied
 std::string FinalState_NoCut::name() const { return "FinalState_NoCut"; }
 bool FinalState_NoCut::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
     return true;
 }
 
-
-/*
-    I) Lepton selections:
-        1) Filter all leptons (e, mu) with pT > threshold (eg. 10 GeV)
-        2) Require either
-        - 1 muon + 3 electrons or 1 electron + 3 muons
-        3) Conservative of charge requirement: net charge = 0
-    Meta info to store:
-        - l1flavor (0=e,1=mu) -> To store prompt lepton from H decay
-        - l2flavor (0=e,1=mu)
-        - l3flavor (0=e,1=mu)
-        - l4flavor (0=e,1=mu)
-        - l1 index
-        - l2 index
-        - l3 index
-        - l4 index
-*/
-
+// -----------------------------------------------------------------------------
+// Lepton Selection
+// -----------------------------------------------------------------------------
 std::string LeptonSelection::name() const { return "LeptonSelection"; }
+
 bool LeptonSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
     if (!evt.d) return false;
-    // store selected leptons
-    struct Lepton {
-        int index;
-        int flavor; // 0=e,1=mu
-        double pt;
-        int charge;
+
+    // Helper to extract passing leptons
+    auto extract = [&](int n, const float* pts, const int* charges, int flav) {
+        std::vector<LeptonObj> leps;
+        for (int i = 0; i < n; ++i) {
+            if (pts[i] > cfg.lepton_pt_min) leps.push_back({i, flav, (double)pts[i], charges[i]});
+        }
+        return leps;
     };
-    std::vector<Lepton> selected_muons;
-    std::vector<Lepton> selected_electrons;
 
-    // select electrons
-    for (int i = 0; i < evt.d->Electron_size; ++i) {
-        if (evt.d->Electron_PT[i] > cfg.lepton_pt_min) {
-            selected_electrons.push_back(Lepton{i, 0, evt.d->Electron_PT[i], evt.d->Electron_Charge[i]});
-        }
-    }
+    auto electrons = extract(evt.d->Electron_size, evt.d->Electron_PT, evt.d->Electron_Charge, ELECTRON);
+    auto muons     = extract(evt.d->Muon_size, evt.d->Muon_PT, evt.d->Muon_Charge, MUON);
 
-    // select muons
-    for (int i = 0; i < evt.d->Muon_size; ++i) {
-        if (evt.d->Muon_PT[i] > cfg.lepton_pt_min) {
-            selected_muons.push_back(Lepton{i, 1, evt.d->Muon_PT[i], evt.d->Muon_Charge[i]});
-        }
-    }
+    // Topology: (1e + 3mu) OR (1mu + 3e)
+    bool is_1e_3mu = (electrons.size() == 1 && muons.size() == 3);
+    bool is_1mu_3e = (muons.size() == 1 && electrons.size() == 3);
 
-    // check for 1 mu + 3 e or 1 e + 3 mu
-    if (!((selected_muons.size() == 1 && selected_electrons.size() == 3) ||
-          (selected_muons.size() == 3 && selected_electrons.size() == 1))) {
-        return false;
-    }
-    // check net charge = 0
+    if (!is_1e_3mu && !is_1mu_3e) return false;
+
+    // Net Charge Check
     int net_charge = 0;
-    for (const auto& mu : selected_muons) {
-        net_charge += mu.charge;
-    }
-    for (const auto& ele : selected_electrons) {
-        net_charge += ele.charge;
-    }
+    for(auto& l : electrons) net_charge += l.charge;
+    for(auto& l : muons)     net_charge += l.charge;
     if (net_charge != 0) return false;
 
-    // store in meta (1st lepton = prompt lepton from H decay, or lepton with only one copy)
-    // if comb: 1 mu + 3 e, 1st = muon, else 1st = electron
-    
-    if (selected_muons.size() == 1) {
-        // 1 mu + 3 e
-        meta.l1flavor = 1;
-        meta.l1_index = selected_muons[0].index;
-        // // sort electrons by pT descending
-        // std::sort(selected_electrons.begin(), selected_electrons.end(),
-        //           [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
-        // meta.l2flavor = 0; meta.l2_index = selected_electrons[0].index;
-        // meta.l3flavor = 0; meta.l3_index = selected_electrons[1].index;
-        // meta.l4flavor = 0; meta.l4_index = selected_electrons[2].index;
+    // Identify Singleton (L1) and Triplet (L2, L3, L4)
+    // If 1mu+3e: Singleton is muons, Triplet is electrons.
+    const auto& singleton = is_1mu_3e ? muons : electrons;
+    const auto& triplet   = is_1mu_3e ? electrons : muons;
 
-        // e with the same sign as mu -> l2 (z boson candidate)
-        // other sorted by pT -> l3, l4
-        std::vector<Lepton> same_sign_electrons;
-        std::vector<Lepton> opp_sign_electrons;
-        for (const auto& ele : selected_electrons) {
-            if (ele.charge == selected_muons[0].charge) {
-                same_sign_electrons.push_back(ele);
-            } else {
-                opp_sign_electrons.push_back(ele);
-            }
-        }
-        if (same_sign_electrons.size() != 1 || opp_sign_electrons.size() != 2) {
-            return false; // should not happen due to net charge check
-        }
-        meta.l2flavor = 0; meta.l2_index = same_sign_electrons[0].index;
-        // sort opp_sign_electrons by pT descending
-        std::sort(opp_sign_electrons.begin(), opp_sign_electrons.end(),
-                  [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
-        meta.l3flavor = 0; meta.l3_index = opp_sign_electrons[0].index;
-        meta.l4flavor = 0; meta.l4_index = opp_sign_electrons[1].index;
-    } else {
-        // 1 e + 3 mu
-        meta.l1flavor = 0;
-        meta.l1_index = selected_electrons[0].index;
-        // // sort muons by pT descending
-        // std::sort(selected_muons.begin(), selected_muons.end(),
-        //           [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
-        // meta.l2flavor = 1; meta.l2_index = selected_muons[0].index;
-        // meta.l3flavor = 1; meta.l3_index = selected_muons[1].index;
-        // meta.l4flavor = 1; meta.l4_index = selected_muons[2].index;
+    // Assign L1 (The unique flavor lepton)
+    const auto& l1 = singleton[0];
+    meta.l1flavor = l1.flavor;
+    meta.l1_index = l1.index;
 
-        // mu with the same sign as e -> l2 (z boson candidate)
-        // other sorted by pT -> l3, l4
-        std::vector<Lepton> same_sign_muons;
-        std::vector<Lepton> opp_sign_muons;
-        for (const auto& mu : selected_muons) {
-            if (mu.charge == selected_electrons[0].charge) {
-                same_sign_muons.push_back(mu);
-            } else {
-                opp_sign_muons.push_back(mu);
-            }
-        }
-        if (same_sign_muons.size() != 1 || opp_sign_muons.size() != 2) {
-            return false; // should not happen due to net charge check
-        }
-        meta.l2flavor = 1; meta.l2_index = same_sign_muons[0].index;
-        // sort opp_sign_muons by pT descending
-        std::sort(opp_sign_muons.begin(), opp_sign_muons.end(),
-                  [](const Lepton& a, const Lepton& b) { return a.pt > b.pt; });
-        meta.l3flavor = 1; meta.l3_index = opp_sign_muons[0].index;
-        meta.l4flavor = 1; meta.l4_index = opp_sign_muons[1].index;
+    // Sort Triplet based on charge relative to L1
+    // Logic: If Net Charge is 0, and we have 1 vs 3.
+    // Let L1 charge be Q. 
+    // The triplet must contain one lepton with charge Q (SS) and two with -Q (OS).
+    // Or else net charge wouldn't be 0.
+    std::vector<const LeptonObj*> ss_leptons; // Same Sign as L1
+    std::vector<const LeptonObj*> os_leptons; // Opposite Sign to L1
+
+    for (const auto& l : triplet) {
+        if (l.charge == l1.charge) ss_leptons.push_back(&l);
+        else                       os_leptons.push_back(&l);
     }
+
+    if (ss_leptons.size() != 1 || os_leptons.size() != 2) return false;
+
+    // Assign L2 (The SS lepton) -> this must be z boson candidate
+    meta.l2flavor = ss_leptons[0]->flavor;
+    meta.l2_index = ss_leptons[0]->index;
+
+    // Sort OS leptons by pT (Descending)
+    std::sort(os_leptons.begin(), os_leptons.end(), [](const LeptonObj* a, const LeptonObj* b) {
+        return a->pt > b->pt;
+    });
+
+    // Assign L3, L4 (The OS leptons)
+    meta.l3flavor = os_leptons[0]->flavor; meta.l3_index = os_leptons[0]->index;
+    meta.l4flavor = os_leptons[1]->flavor; meta.l4_index = os_leptons[1]->index;
+
     return true;
 }
 
-// Old Z to ll selection
-std::string ZToLLSelection::name() const { return "Z_to_ll"; }
-bool ZToLLSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
-    if (!evt.d) return false;
-    double bestDiff = 1e9;
-    int best_i = -1, best_j = -1, best_flav = -1; // 0=e,1=mu
-    double bestMass = std::numeric_limits<double>::quiet_NaN();
-
-    // electrons
-    for (int i = 0; i < evt.d->Electron_size; ++i) {
-        if (evt.d->Electron_PT[i] < cfg.zl_pt_min) continue; // pT cut
-        for (int j = i+1; j < evt.d->Electron_size; ++j) {
-            if (evt.d->Electron_PT[j] < cfg.zl_pt_min) continue; // pT cut
-            if (evt.d->Electron_Charge[i]*evt.d->Electron_Charge[j] >= 0) continue; // OS
-            TLorentzVector l1, l2;
-            l1.SetPtEtaPhiM(evt.d->Electron_PT[i], evt.d->Electron_Eta[i], evt.d->Electron_Phi[i], Me);
-            l2.SetPtEtaPhiM(evt.d->Electron_PT[j], evt.d->Electron_Eta[j], evt.d->Electron_Phi[j], Me);
-            double mass = (l1+l2).M();
-            double diff = mass - cfg.z_mass;
-            if (diff < cfg.z_mass_window_upper && diff > -cfg.z_mass_window_lower && diff < bestDiff) {
-                bestDiff = diff; best_i = i; best_j = j; best_flav = 0; bestMass = mass;
-            }
-        }
-    }
-
-    // muons
-    for (int i = 0; i < evt.d->Muon_size; ++i) {
-        for (int j = i+1; j < evt.d->Muon_size; ++j) {
-            if (evt.d->Muon_Charge[i]*evt.d->Muon_Charge[j] >= 0) continue; // OS
-            TLorentzVector l1, l2;
-            l1.SetPtEtaPhiM(evt.d->Muon_PT[i], evt.d->Muon_Eta[i], evt.d->Muon_Phi[i], Mmu);
-            l2.SetPtEtaPhiM(evt.d->Muon_PT[j], evt.d->Muon_Eta[j], evt.d->Muon_Phi[j], Mmu);
-            double mass = (l1+l2).M();
-            double diff = mass - cfg.z_mass;
-            if (diff < cfg.z_mass_window_upper && diff > -cfg.z_mass_window_lower && diff < bestDiff) {
-                bestDiff = diff; best_i = i; best_j = j; best_flav = 1; bestMass = mass;
-            }
-        }
-    }
-
-    if (best_flav == -1) return false;
-    meta.z_l1 = best_i; meta.z_l2 = best_j; meta.z_flavor = best_flav;
-    meta.z_mass = bestMass; meta.z_mass_diff = bestDiff;
-    return true;
-}
-
-
-
-
-/*
-    II) Z candidate selection:
-        1) Identify flavor of Z candidate (ee or mumu) from the selected leptons
-        - if 1 muon + 3 electrons: Z->ee
-        - if 1 electron + 3 muons: Z->mumu
-        2) from 3 leptons:
-            - select one that have same sign as the prompt lepton from H decay -> first lepton candidate
-        3) Loop based on the Z from 2)
-            - check OS for the two leptons from Z
-            - compute invariant mass
-            - check mass window
-    Meta info to store:
-        - z_l1 index
-        - z_l2 index
-        - z_flavor (0=e,1=mu)
-        - z_mass
-        - z_mass_diff
-*/
+// -----------------------------------------------------------------------------
+// Z Candidate Selection
+// -----------------------------------------------------------------------------
 
 std::string ZCandidateSelection::name() const { return "ZCandidateSelection"; }
 bool ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
     if (!evt.d) return false;
-    // determine Z flavor
-    int z_flav = -1; // 0=e,1=mu
-    if (meta.l1flavor == 1 && meta.l2flavor == 0 && meta.l3flavor == 0 && meta.l4flavor == 0) {
-        z_flav = 0; // Z->ee
-    } else if (meta.l1flavor == 0 && meta.l2flavor == 1 && meta.l3flavor == 1 && meta.l4flavor == 1) {
-        z_flav = 1; // Z->mumu
-    } else {
-        return false; // invalid flavor combination
-    }
-    // identify first lepton candidate from Z
-    int first_z_lep_index = -1;
-    // get charge of prompt lepton from H decay
-    int prompt_lep_charge = 0;
-    if (meta.l1flavor == 0) {
-        prompt_lep_charge = evt.d->Electron_Charge[meta.l1_index];
-    } else if (meta.l1flavor == 1) {
-        prompt_lep_charge = evt.d->Muon_Charge[meta.l1_index];
-    }
-    // identify first lepton candidate from Z (same sign as prompt lepton)
-    if (z_flav == 0) {
-        // Z->ee
-        for (int i = 2; i <=4; ++i) {
-            int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
-            if (evt.d->Electron_Charge[idx] == prompt_lep_charge) {
-                first_z_lep_index = idx;
-                break;
-            }
-        }
-    } else if (z_flav == 1) {
-        // Z->mumu
-        for (int i = 2; i <=4; ++i) {
-            int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
-            if (evt.d->Muon_Charge[idx] == prompt_lep_charge) {
-                first_z_lep_index = idx;
-                break;
-            }
-        }
-    }
-    if (first_z_lep_index == -1) return false; // could not find
+
+    // 1. Determine Z flavor (inverse of L1 flavor)
+    int z_flav = (meta.l1flavor == ELECTRON) ? MUON : ELECTRON;
+
+    // 2. L2 is GUARANTEED to be the first Z candidate 
+    // (It is the only lepton in the triplet with the same sign as L1)
+    int z1_idx = meta.l2_index;
     
-    int second_z_lep_index = -1;
-    double bestDiff = 1e9;
-    double bestMass = std::numeric_limits<double>::quiet_NaN();
-    if (z_flav == 0) {
-        // Z->ee
-        for (int i = 2; i <=4; ++i) {
-            int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
-            if (idx == first_z_lep_index) continue;
-            // check OS
-            if (evt.d->Electron_Charge[first_z_lep_index] * evt.d->Electron_Charge[idx] >= 0) continue;
-            // compute invariant mass
-            TLorentzVector l1, l2;
-            l1.SetPtEtaPhiM(evt.d->Electron_PT[first_z_lep_index], evt.d->Electron_Eta[first_z_lep_index],
-                            evt.d->Electron_Phi[first_z_lep_index], Me);
-            l2.SetPtEtaPhiM(evt.d->Electron_PT[idx], evt.d->Electron_Eta[idx],
-                            evt.d->Electron_Phi[idx], Me);
-            double mass = (l1 + l2).M();
-            double diff = mass - cfg.z_mass;
-            if (diff < cfg.z_mass_window_upper && diff > -cfg.z_mass_window_lower) {
-                if (diff < bestDiff) {
-                    bestDiff = diff;
-                    bestMass = mass;
-                    second_z_lep_index = idx;
-                }
+    // 3. Test L2 against L3 and L4 to find the best Z partner
+    // We only need to check the OS candidates (L3, L4)
+    int candidates[2] = {meta.l3_index, meta.l4_index};
+    
+    int best_z2_idx  = -1;
+    int h2_idx       = -1;
+    int otherZ_idx   = -1; // The one NOT selected
+    int otherH_idx   = -1; // The one NOT selected (for Higgs)
+    double best_diff = 1e9;
+    double best_mass = std::numeric_limits<double>::quiet_NaN();
+
+    // Get L2 P4 once
+    TLorentzVector p4_z1 = get_p4(evt, z1_idx, z_flav);
+
+    for (int idx : candidates) {
+        TLorentzVector p4_z2 = get_p4(evt, idx, z_flav);
+        double mass = (p4_z1 + p4_z2).M();
+        double diff = mass - cfg.z_mass;
+
+        if (diff < cfg.z_mass_window_upper && diff > -cfg.z_mass_window_lower) {
+            if (diff < best_diff) {
+                best_diff = diff;
+                best_mass = mass;
+                best_z2_idx = idx;
+                h2_idx = (idx == candidates[0]) ? candidates[1] : candidates[0];
+                // Alternative pair; this serves as check if our selection is correct
+                otherZ_idx = h2_idx; // swap
+                otherH_idx = idx;
             }
         }
     }
-    if (z_flav == 1) {
-        // Z->mumu
-        for (int i = 2; i <=4; ++i) {
-            int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
-            if (idx == first_z_lep_index) continue;
-            // check OS
-            if (evt.d->Muon_Charge[first_z_lep_index] * evt.d->Muon_Charge[idx] >= 0) continue;
-            // compute invariant mass
-            TLorentzVector l1, l2;
-            l1.SetPtEtaPhiM(evt.d->Muon_PT[first_z_lep_index], evt.d->Muon_Eta[first_z_lep_index],
-                            evt.d->Muon_Phi[first_z_lep_index], Mmu);
-            l2.SetPtEtaPhiM(evt.d->Muon_PT[idx], evt.d->Muon_Eta[idx],
-                            evt.d->Muon_Phi[idx], Mmu);
-            double mass = (l1 + l2).M();
-            double diff = mass - cfg.z_mass;
-            if (diff < cfg.z_mass_window_upper && diff > -cfg.z_mass_window_lower) {
-                if (diff < bestDiff) {
-                    bestDiff = diff;
-                    bestMass = mass;
-                    second_z_lep_index = idx;
-                }
-            }
-        }   
-    }
-    if (second_z_lep_index != -1) {
-        meta.z_l1 = first_z_lep_index;
-        meta.z_l2 = second_z_lep_index;
+
+    if (best_z2_idx != -1) {
+        meta.z_l1 = z1_idx;
+        meta.z_l2 = best_z2_idx;
         meta.z_flavor = z_flav;
-        meta.z_mass = bestMass;
-        meta.z_mass_diff = bestDiff;
-        // return true;
-    
-    
-        // Calculate the invariant mass of Z case 1 (use best pair)
-        meta.m_z1 = meta.z_mass;
-        // Calculate the invariant mass of Z case 2 (use 1st z candidate + second best lepton)
-        // e.g., e1 (z 1st cand), e2 (z best pair), e3 (remaining) -> use e1 + e3 to calculate m_z2
-        int remaining_lep_index = -1;
-        if (z_flav == 0) {
-            // Z->ee
-            for (int i = 2; i <=4; ++i) {
-                int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
-                if (idx != meta.z_l1 && idx != meta.z_l2) {
-                    remaining_lep_index = idx;
-                    break;
-                }
-            }
-            if (remaining_lep_index != -1) {
-                TLorentzVector l1, l2;
-                l1.SetPtEtaPhiM(evt.d->Electron_PT[meta.z_l1], evt.d->Electron_Eta[meta.z_l1],
-                                evt.d->Electron_Phi[meta.z_l1], Me);
-                l2.SetPtEtaPhiM(evt.d->Electron_PT[remaining_lep_index], evt.d->Electron_Eta[remaining_lep_index],
-                                evt.d->Electron_Phi[remaining_lep_index], Me);
-                meta.m_z2 = (l1 + l2).M();
-            }
-            meta.h_e_pt = evt.d->Electron_PT[remaining_lep_index];
-            meta.h_mu_pt = evt.d->Muon_PT[meta.l1_index];
+        meta.z_mass = best_mass;
+        meta.z_mass_diff = best_diff;
+        meta.otherZ_idx = otherZ_idx;
+        meta.otherH_idx = otherH_idx;
+        meta.h_e = (meta.l1flavor == ELECTRON) ? meta.l1_index : h2_idx;
+        meta.h_mu = (meta.l1flavor == MUON) ? meta.l1_index : h2_idx;
+        meta.h_e_pt = evt.d->Electron_PT[meta.h_e];
+        meta.h_mu_pt = evt.d->Muon_PT[meta.h_mu];
 
-        } else if (z_flav == 1) {
-            // Z->mumu
-            for (int i = 2; i <=4; ++i) {
-                int idx = (i == 2) ? meta.l2_index : (i == 3) ? meta.l3_index : meta.l4_index;
-                if (idx != meta.z_l1 && idx != meta.z_l2) {
-                    remaining_lep_index = idx;
-                    break;
-                }
-            }
-            if (remaining_lep_index != -1) {
-                TLorentzVector l1, l2;
-                l1.SetPtEtaPhiM(evt.d->Muon_PT[meta.z_l1], evt.d->Muon_Eta[meta.z_l1],
-                                evt.d->Muon_Phi[meta.z_l1], Mmu);
-                l2.SetPtEtaPhiM(evt.d->Muon_PT[remaining_lep_index], evt.d->Muon_Eta[remaining_lep_index],
-                                evt.d->Muon_Phi[remaining_lep_index], Mmu);
-                meta.m_z2 = (l1 + l2).M();
-            }
-            meta.h_mu_pt = evt.d->Muon_PT[remaining_lep_index];
-            meta.h_e_pt = evt.d->Electron_PT[meta.l1_index];
-        }
-
-
-        // recoil mass calculation (240 GeV collider)
-        TLorentzVector p_beam1, p_beam2, p_beam_total;
-        double beam_energy = 240.0 / 2.0;
-        p_beam1.SetPxPyPzE(0.0, 0.0, beam_energy, beam_energy);
-        p_beam2.SetPxPyPzE(0.0, 0.0, -beam_energy, beam_energy);
-        p_beam_total = p_beam1 + p_beam2;
-        TLorentzVector p_z;
-        if (z_flav == 0) {
-            // Z->ee
-            TLorentzVector l1, l2;
-            l1.SetPtEtaPhiM(evt.d->Electron_PT[meta.z_l1], evt.d->Electron_Eta[meta.z_l1],
-                            evt.d->Electron_Phi[meta.z_l1], Me);
-            l2.SetPtEtaPhiM(evt.d->Electron_PT[meta.z_l2], evt.d->Electron_Eta[meta.z_l2],
-                            evt.d->Electron_Phi[meta.z_l2], Me);
-            p_z = l1 + l2;
-        } else if (z_flav == 1) {
-            // Z->mumu
-            TLorentzVector l1, l2;
-            l1.SetPtEtaPhiM(evt.d->Muon_PT[meta.z_l1], evt.d->Muon_Eta[meta.z_l1],
-                            evt.d->Muon_Phi[meta.z_l1], Mmu);
-            l2.SetPtEtaPhiM(evt.d->Muon_PT[meta.z_l2], evt.d->Muon_Eta[meta.z_l2],
-                            evt.d->Muon_Phi[meta.z_l2], Mmu);
-            p_z = l1 + l2;
-        }
-        TLorentzVector p_recoil = p_beam_total - p_z;
-        meta.m_recoil = p_recoil.M(); // this actually higgs
-        // debug print recoil mass
-        // std::cout << "Recoil mass: " << meta.m_recoil << std::endl;
-
-        // Perform the boost 
-        TVector3 boost_vector = -p_recoil.BoostVector();
-        meta.beta_x = boost_vector.X();
-        meta.beta_y = boost_vector.Y();
-        meta.beta_z = boost_vector.Z();
-
-        // absolute DZ and D0 for leptons from H decay
-        int h_lep_index = meta.l1_index;
-        if (meta.l1flavor == 0) {
-            // H->e
-            meta.h_e_dz = evt.d->Electron_DZ[h_lep_index];
-            meta.h_e_d0 = evt.d->Electron_D0[h_lep_index];
-        } else if (meta.l1flavor == 1) {
-            // H->mu
-            meta.h_mu_dz = evt.d->Muon_DZ[h_lep_index];
-            meta.h_mu_d0 = evt.d->Muon_D0[h_lep_index];
-        }
-        // remaining lepton DZ and D0
-        if (z_flav == 0) {
-            // Z->ee, remaining lepton is electron
-            meta.h_e_dz = std::abs(evt.d->Electron_DZ[remaining_lep_index]);
-            meta.h_e_d0 = std::abs(evt.d->Electron_D0[remaining_lep_index]);
-        }
-        else if (z_flav == 1) {
-            // Z->mumu, remaining lepton is muon
-            meta.h_mu_dz = std::abs(evt.d->Muon_DZ[remaining_lep_index]);
-            meta.h_mu_d0 = std::abs(evt.d->Muon_D0[remaining_lep_index]);
-        }
+        // Post-calculations
+        compute_z_post_calculations(evt, meta, cfg);
 
         return true;
     }
+
     return false;
 }
 
+// -----------------------------------------------------------------------------
+// H candidate Selections (for mH > 150 GeV)
+// -----------------------------------------------------------------------------
+std::string HCandidateSelection::name() const { return "HCandidateSelection"; }
+bool HCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
+    if (!evt.d) return false;
+    // Choose the pair in which collinear mass is highest -> assign to higgs
+    // The pair must > 145 GeV
+    int idx_h1 = meta.l1_index; // singleton
+    bool is_h1_tau_vis = false;
+
+    int candidates[2] = {meta.l3_index, meta.l4_index};
+    double best_mcol = -1.0;
+    int best_h2_idx = -1;
+
+    int otherZ_idx = -1;
+    int otherH_idx = -1;
+    int z2_idx = -1;
+
+    // use 'cfg.mode' to indicate collinear mass selection either mutaue or etaumu
+    if (cfg.mode == 1) { // mutaue
+        is_h1_tau_vis = (meta.l1flavor == MUON) ? false : true;
+    } else if (cfg.mode == 0) { // etamu
+        is_h1_tau_vis = (meta.l1flavor == ELECTRON) ? false : true;
+    } else {
+        std::cout << "HCandidateSelection: Unknown mode '" << cfg.mode << "'. Expected 'mutaue' or 'etamu'." << std::endl;
+        return false;
+    }
+    
+
+    TLorentzVector p4_h1 = get_p4(evt, idx_h1, meta.l1flavor);
+
+    for (int idx_h2 : candidates) {
+        TLorentzVector p4_h2 = get_p4(evt, idx_h2, meta.l3flavor);
+        // double m_collinear = compute_collinear_mass(evt, tau_vis, other_lep);
+        TLorentzVector v_tau_vis = is_h1_tau_vis ? p4_h1 : p4_h2;
+        TLorentzVector v_other   = is_h1_tau_vis ? p4_h2 : p4_h1;
+        double m_collinear = compute_collinear_mass(evt, v_tau_vis, v_other);
+        if (m_collinear > cfg.mcol_min && m_collinear > best_mcol) {
+            best_mcol = m_collinear;
+            best_h2_idx = idx_h2;
+            z2_idx = (idx_h2 == candidates[0]) ? candidates[1] : candidates[0];
+            // Alternative pair; this serves as check if our selection is correct
+            otherZ_idx = idx_h2;
+            otherH_idx = z2_idx;
+
+        }
+    }
+
+    if (best_h2_idx != -1) {
+        meta.h_mu = (meta.l1flavor == MUON) ? meta.l1_index : best_h2_idx;
+        meta.h_e  = (meta.l1flavor == ELECTRON) ? meta.l1_index : best_h2_idx;
+        meta.h_mu_pt = evt.d->Muon_PT[meta.h_mu];
+        meta.h_e_pt  = evt.d->Electron_PT[meta.h_e];
+        meta.otherZ_idx = otherZ_idx;
+        meta.otherH_idx = otherH_idx;
+        meta.m_collinear = best_mcol;
+
+        // Z candidate info
+        meta.z_l1 = meta.l2_index;
+        meta.z_l2 = z2_idx;
+        meta.z_flavor = (meta.l1flavor == ELECTRON) ? MUON : ELECTRON;
+        meta.z_mass = (get_p4(evt, meta.z_l1, meta.z_flavor) + get_p4(evt, meta.z_l2, meta.z_flavor)).M();
+        meta.z_mass_diff = meta.z_mass - cfg.z_mass;
+
+        // Post-calculations
+        compute_z_post_calculations(evt, meta, cfg);
+
+        return true;
+    }
+
+    return false;
+}
+
+
+// -----------------------------------------------------------------------------
+// H -> Mu Tau -> E selection (Mu is prompt, Tau->E)
+// -----------------------------------------------------------------------------
 std::string HToMuTauESelection::name() const { return "H_to_mutau_e"; }
+
 bool HToMuTauESelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
     if (!evt.d) return false;
-    int zl1 = meta.z_l1, zl2 = meta.z_l2;
 
-    // Handle for invalid indices
-    if (zl1 < 0 || zl2 < 0) return false;
+    int zl1 = meta.z_l1;
+    int zl2 = meta.z_l2;
+    int idx_mu = meta.h_mu;
+    int idx_e  = meta.h_e;
+    // OS Check
+    if (evt.d->Muon_Charge[idx_mu] * evt.d->Electron_Charge[idx_e] >= 0) return false;
 
-    int idx_mu = -1;
-    for (int m = 0; m < evt.d->Muon_size; ++m) {
-        if (meta.z_flavor == 1 && (m == zl1 || m == zl2)) continue; // exclude Z muons
-        if (evt.d->Muon_PT[m] > cfg.mu_pt_min) {
-            if (idx_mu == -1) idx_mu = m; else return false; // more than one
-        }
-    }
-    if (idx_mu < 0) return false;
-
-    int idx_e = -1;
-    for (int e = 0; e < evt.d->Electron_size; ++e) {
-        if (meta.z_flavor == 0 && (e == zl1 || e == zl2)) continue; // exclude Z electrons
-        if (evt.d->Electron_PT[e] > cfg.e_pt_min) {
-            if (idx_e == -1) idx_e = e; else return false; // more than one
-        }
-    }
-    if (idx_e < 0) return false;
-
-    if (evt.d->Muon_Charge[idx_mu] * evt.d->Electron_Charge[idx_e] >= 0) return false; // OS
-
-    meta.h_mu = idx_mu;
-    meta.h_e = idx_e;
-
-    meta.h_mu_pt = evt.d->Muon_PT[idx_mu];
-    meta.h_e_pt = evt.d->Electron_PT[idx_e];
-
-    // precompute dphi_e_met
-    if (evt.d->MissingET_size > 0) {
-        meta.dphi_e_met = deltaPhiFromPhis(evt.d->Electron_Phi[idx_e], evt.d->MissingET_Phi[0]);
-    }
-    // precompute dphi_mu_met
-    if (evt.d->MissingET_size > 0) {
-        meta.dphi_mu_met = deltaPhiFromPhis(evt.d->Muon_Phi[idx_mu], evt.d->MissingET_Phi[0]);
-    }
-    // DeltaPhi(mu, e)
-    if (evt.d->Muon_size > 0 && evt.d->Electron_size > 0) {
-        meta.dphi_mu_e = deltaPhiFromPhis(evt.d->Muon_Phi[idx_mu], evt.d->Electron_Phi[idx_e]);
-    }
-    // collinear mass
-    if (evt.d->MissingET_size > 0) {
-        meta.m_collinear = computeCollinearMassMuTauE(evt, idx_mu, idx_e);
-        meta.m_transverse_e = computeTransverseMass(evt, 0, idx_e);
-        meta.m_transverse_mu = computeTransverseMass(evt, 1, idx_mu);
-    }
-
-    // calculate collinear mass in 2 scenarios
-    // Scenario 1: consider Z candidate with closest mass to m_Z a Z's leptons-> same as above
-    meta.m_h1 = meta.m_collinear;
-    // Scenario 2: consider second best Z candidate's leptons as Z's leptons -> causing the H collinear mass to be
-    // calculated using the remaining leptons (h_mu, zl2, MET) or m_h2 = collinear mass of system (h_mu, zl2, MET)
-    if (meta.z_flavor == 0) {
-        // Z->ee, remaining lepton is muon
-        meta.m_h2 = computeCollinearMassMuTauE(evt, idx_mu, zl2);
-    } else if (meta.z_flavor == 1) {
-        // Z->mumu, remaining lepton is electron
-        meta.m_h2 = computeCollinearMassMuTauE(evt, zl2, idx_e);
-    }
-    meta.deltaR_mu_e = computeDeltaR(1, evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu],
-                                     0, evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e]);
-
+    // PT requirements
+    if (evt.d->Muon_PT[idx_mu] < cfg.mu_pt_min) return false;
+    if (evt.d->Electron_PT[idx_e] < cfg.e_pt_min) return false;
     
-    // boost leptons to Higgs rest frame
-    TVector3 boost_vector(meta.beta_x, meta.beta_y, meta.beta_z);
-    TLorentzVector muon_vec, electron_vec;
-    muon_vec.SetPtEtaPhiM(evt.d->Muon_PT[idx_mu], evt.d->Muon_Eta[idx_mu], evt.d->Muon_Phi[idx_mu], Mmu);
-    electron_vec.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
-    muon_vec.Boost(boost_vector);
-    electron_vec.Boost(boost_vector);
+    // Compute Kinematics
+    TLorentzVector v_mu = get_p4(evt, idx_mu, MUON);
+    TLorentzVector v_e  = get_p4(evt, idx_e, ELECTRON);
     
-    meta.h_mu_boosted_pt = muon_vec.Pt();
-    meta.h_e_boosted_pt = electron_vec.Pt();
+    if (evt.d->MissingET_size > 0) {
+        double met_phi = evt.d->MissingET_Phi[0];
+        double met     = evt.d->MissingET_MET[0];
+        
+        meta.dphi_e_met  = delta_phi(v_e.Phi(), met_phi);
+        meta.dphi_mu_met = delta_phi(v_mu.Phi(), met_phi);
+        meta.m_transverse_e  = compute_transverse_mass(v_e.Pt(), v_e.Phi(), met, met_phi);
+        meta.m_transverse_mu = compute_transverse_mass(v_mu.Pt(), v_mu.Phi(), met, met_phi);
+
+        // Collinear Mass: Tau decays to Electron. v_tau_vis = v_e. Other = v_mu.
+        meta.m_collinear = compute_collinear_mass(evt, v_e, v_mu);
+        meta.m_h1 = meta.m_collinear;
+        
+        // Invariant Mass (Visible + MET)
+        TLorentzVector v_met;
+        v_met.SetPtEtaPhiM(met, 0.0, met_phi, 0.0);
+        meta.m_h_invariant = (v_mu + v_e + v_met).M();
+    }
+
+    meta.dphi_mu_e = std::abs(v_mu.DeltaPhi(v_e));
+    meta.deltaR_mu_e = v_mu.DeltaR(v_e);
+
+    // Boosted kinematics
+    TVector3 boost_vec(meta.beta_x, meta.beta_y, meta.beta_z);
+    v_mu.Boost(boost_vec);
+    v_e.Boost(boost_vec);
+    meta.h_mu_boosted_pt = v_mu.Pt();
+    meta.h_e_boosted_pt = v_e.Pt();
 
     return true;
 }
-// H->e tau_mu selection
+
+// -----------------------------------------------------------------------------
+// H -> E Tau -> Mu selection (E is prompt, Tau->Mu)
+// -----------------------------------------------------------------------------
 std::string HToETauMuSelection::name() const { return "H_to_etau_mu"; }
+
 bool HToETauMuSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
     if (!evt.d) return false;
-    // Implementation similar to HToMuESelection but for e and tau_mu
-    int zl1 = meta.z_l1, zl2 = meta.z_l2;
 
-    // Handle for invalid indices
-    if (zl1 < 0 || zl2 < 0) return false;
+    int zl1 = meta.z_l1;
+    int zl2 = meta.z_l2;
+    int idx_tau_mu = meta.h_mu;
+    int idx_e      = meta.h_e;
+    // OS Check
+    if (evt.d->Muon_Charge[idx_tau_mu] * evt.d->Electron_Charge[idx_e] >= 0) return false;
+    // PT requirements
+    if (evt.d->Muon_PT[idx_tau_mu] < cfg.mu_pt_min) return false;
+    if (evt.d->Electron_PT[idx_e] < cfg.e_pt_min) return false;
 
-    int idx_tau_mu = -1;
-    for (int m = 0; m < evt.d->Muon_size; ++m) {
-        if (meta.z_flavor == 1 && (m == zl1 || m == zl2)) continue; // exclude Z muons
-        if (evt.d->Muon_PT[m] > cfg.mu_pt_min) {
-            if (idx_tau_mu == -1) idx_tau_mu = m; else return false; // more than one
-        }
-    }
-    if (idx_tau_mu < 0) return false;
+    TLorentzVector v_mu = get_p4(evt, idx_tau_mu, MUON);
+    TLorentzVector v_e  = get_p4(evt, idx_e, ELECTRON);
 
-    int idx_e = -1;
-    for (int e = 0; e < evt.d->Electron_size; ++e) {
-        if (meta.z_flavor == 0 && (e == zl1 || e == zl2)) continue; // exclude Z electrons
-        if (evt.d->Electron_PT[e] > cfg.e_pt_min) {
-            if (idx_e == -1) idx_e = e; else return false; // more than one
-        }
-    }
-    if (idx_e < 0) return false;
-
-    if (evt.d->Muon_Charge[idx_tau_mu] * evt.d->Electron_Charge[idx_e] >= 0) return false; // OS
-
-    meta.h_mu = idx_tau_mu;
-    meta.h_e = idx_e;
-
-    meta.h_mu_pt = evt.d->Muon_PT[idx_tau_mu];
-    meta.h_e_pt = evt.d->Electron_PT[idx_e];
-
-    // precompute dphi_e_met
     if (evt.d->MissingET_size > 0) {
-        meta.dphi_e_met = deltaPhiFromPhis(evt.d->Electron_Phi[idx_e], evt.d->MissingET_Phi[0]);
-    }
-    // precompute dphi_mu_met
-    if (evt.d->MissingET_size > 0) {
-        meta.dphi_mu_met = deltaPhiFromPhis(evt.d->Muon_Phi[idx_tau_mu], evt.d->MissingET_Phi[0]);
-    }
-    // DeltaPhi(mu, e)
-    if (evt.d->Muon_size > 0 && evt.d->Electron_size > 0) {
-        meta.dphi_mu_e = deltaPhiFromPhis(evt.d->Muon_Phi[idx_tau_mu], evt.d->Electron_Phi[idx_e]);
-    }
-    // collinear mass
-    if (evt.d->MissingET_size > 0) {
-        meta.m_collinear = computeCollinearMassETauMu(evt, idx_e, idx_tau_mu);
-        meta.m_transverse_e = computeTransverseMass(evt, 0, idx_e);  // wrong calculate transverse mass for electron
-        meta.m_transverse_mu = computeTransverseMass(evt, 1, idx_tau_mu);
+        double met_phi = evt.d->MissingET_Phi[0];
+        double met     = evt.d->MissingET_MET[0];
+
+        meta.dphi_e_met  = delta_phi(v_e.Phi(), met_phi);
+        meta.dphi_mu_met = delta_phi(v_mu.Phi(), met_phi);
+        meta.m_transverse_e  = compute_transverse_mass(v_e.Pt(), v_e.Phi(), met, met_phi);
+        meta.m_transverse_mu = compute_transverse_mass(v_mu.Pt(), v_mu.Phi(), met, met_phi);
+
+        // Collinear Mass: Tau decays to Muon. v_tau_vis = v_mu. Other = v_e.
+        meta.m_collinear = compute_collinear_mass(evt, v_mu, v_e); 
+        meta.m_h1 = meta.m_collinear;
+        
+        TLorentzVector v_met;
+        v_met.SetPtEtaPhiM(met, 0.0, met_phi, 0.0);
+        meta.m_h_invariant = (v_mu + v_e + v_met).M();
     }
 
-    // calculate collinear mass in 2 scenarios
-    // Scenario 1: consider Z candidate with closest mass to m_Z a Z's leptons-> same as above
-    meta.m_h1 = meta.m_collinear;
-    // Scenario 2: consider second best Z candidate's leptons as Z's leptons -> causing the H collinear mass to be
-    // calculated using the remaining leptons (h_e, zl2, MET) or m_h2 = collinear mass of system (h_e, zl2, MET)
-    if (meta.z_flavor == 0) {
-        // Z->ee, remaining lepton is muon
-        meta.m_h2 = computeCollinearMassETauMu(evt, zl2, idx_tau_mu);
-    } else if (meta.z_flavor == 1) {
-        // Z->mumu, remaining lepton is electron
-        meta.m_h2 = computeCollinearMassETauMu(evt, idx_e, zl2);
-    }
-    meta.deltaR_mu_e = computeDeltaR(1, evt.d->Muon_Eta[idx_tau_mu], evt.d->Muon_Phi[idx_tau_mu],
-                                     0, evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e]);
+    meta.dphi_mu_e = std::abs(v_mu.DeltaPhi(v_e));
+    meta.deltaR_mu_e = v_mu.DeltaR(v_e);
 
-    // boost leptons to Higgs rest frame
-    TVector3 boost_vector(meta.beta_x, meta.beta_y, meta.beta_z);
-    TLorentzVector muon_vec, electron_vec;
-    muon_vec.SetPtEtaPhiM(evt.d->Muon_PT[idx_tau_mu], evt.d->Muon_Eta[idx_tau_mu], evt.d->Muon_Phi[idx_tau_mu], Mmu);
-    electron_vec.SetPtEtaPhiM(evt.d->Electron_PT[idx_e], evt.d->Electron_Eta[idx_e], evt.d->Electron_Phi[idx_e], Me);
-    muon_vec.Boost(boost_vector);
-    electron_vec.Boost(boost_vector);
-
-    meta.h_mu_boosted_pt = muon_vec.Pt();
-    meta.h_e_boosted_pt = electron_vec.Pt();
+    TVector3 boost_vec(meta.beta_x, meta.beta_y, meta.beta_z);
+    v_mu.Boost(boost_vec);
+    v_e.Boost(boost_vec);
+    meta.h_mu_boosted_pt = v_mu.Pt();
+    meta.h_e_boosted_pt = v_e.Pt();
 
     return true;
 }
 
+// -----------------------------------------------------------------------------
+// MET Cuts
+// -----------------------------------------------------------------------------
 std::string METEDphiSelection::name() const { return "MET_E_dphi"; }
 bool METEDphiSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
-    if (!evt.d) return false;
-    if (meta.h_e < 0) return false; // need H electron selected
-    if (evt.d->MissingET_size <= 0) return false;
-    // if (std::isnan(meta.dphi_e_met)) {
-    //     TLorentzVector v1, v2;
-    //     v1.SetPtEtaPhiM(1.0, 0.0, evt.d->Electron_Phi[meta.h_e], 0.0);
-    //     v2.SetPtEtaPhiM(1.0, 0.0, evt.d->MissingET_Phi[0], 0.0);
-    //     meta.dphi_e_met = std::abs(v1.DeltaPhi(v2));
-    // }
-    // return meta.dphi_e_met < cfg.max_dphi_e_met;
-    // Use precomputed value
+    if (!evt.d || meta.h_e < 0 || evt.d->MissingET_size <= 0) return false;
     if (std::isnan(meta.dphi_e_met)) return false;
     return meta.dphi_e_met < cfg.max_dphi_e_met;
 }
 
 std::string METMuDphiSelection::name() const { return "MET_Mu_dphi"; }
 bool METMuDphiSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
-    if (!evt.d) return false;
-    if (meta.h_mu < 0) return false; // need H muon selected
-    if (evt.d->MissingET_size <= 0) return false;
+    if (!evt.d || meta.h_mu < 0 || evt.d->MissingET_size <= 0) return false;
     if (std::isnan(meta.dphi_mu_met)) return false;
     return meta.dphi_mu_met < cfg.max_dphi_mu_met;
 }
 
-// Alternative selections for the offshell z boson, using recoil mass
-// require recoil mass to be > recoil_mass_min
-// l1 = H candidate lepton
-// l2 = Z candidate lepton 1
-// using l3 and l4, there are two possible matching to form Z boson
-// for analysis, choose the highest recoil pair -> plot recoil_mass_1
-// alternative pair -> recoil_mass_2
+// -----------------------------------------------------------------------------
+// Recoil Mass Selection
+// -----------------------------------------------------------------------------
 std::string RecoilMassSelection::name() const { return "RecoilMassSelection"; }
 bool RecoilMassSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
     if (!evt.d) return false;
 
-    // just plot and return true for analysis
-    // use function computeRecoilMass(event, l1_index, l2_index, flavor1, flavor2), flavor: 0=e,1=mu
-    // pair l2+l3
-    double recoil_mass_l2l3 = computeRecoilMass(evt, meta.l2_index, meta.l3_index,
-                                                        meta.l2flavor, meta.l3flavor);
-    // pair l2+l4
-    double recoil_mass_l2l4 = computeRecoilMass(evt, meta.l2_index, meta.l4_index,
-                                                        meta.l2flavor, meta.l4flavor);
-    // store higher as recoil_mass_1, lower as recoil_mass_2
-    if (recoil_mass_l2l3 >= recoil_mass_l2l4) {
-        meta.m_recoil1 = recoil_mass_l2l3;
-        meta.m_recoil2 = recoil_mass_l2l4;
-    } else {
-        meta.m_recoil1 = recoil_mass_l2l4;
-        meta.m_recoil2 = recoil_mass_l2l3;
-    }
-    // return true;
+    // Helper to calc recoil for a pair
+    auto get_recoil = [&](int i1, int flav1, int i2, int flav2) {
+        TLorentzVector v1 = get_p4(evt, i1, flav1);
+        TLorentzVector v2 = get_p4(evt, i2, flav2);
+        TLorentzVector beam(0, 0, 0, ECM);
+        return (beam - (v1 + v2)).M();
+    };
 
-    // apply selection
-    // Approach 1: require m_recoil_1 > recoil_mass_min, choose highest pair as Z candidate
+    // Calculate recoil for both possible Z pairs within the triplet
+    // (Recall: l2 is SS, l3/l4 are OS relative to l1)
+    double recoil_23 = get_recoil(meta.l2_index, meta.l2flavor, meta.l3_index, meta.l3flavor);
+    double recoil_24 = get_recoil(meta.l2_index, meta.l2flavor, meta.l4_index, meta.l4flavor);
+
+    meta.m_recoil1 = std::max(recoil_23, recoil_24);
+    meta.m_recoil2 = std::min(recoil_23, recoil_24);
+
     if (meta.m_recoil1 > cfg.recoil_mass_min) {
-        // choose the pair corresponding to m_recoil1 as Z candidate
-        // l2+l3
-        meta.z_l1 = meta.l2_index;
-        meta.z_l2 = meta.l3_index;
-        // z mass, mass diff, z flavor
-        TLorentzVector l1, l2;
-        if (meta.l2flavor == 0) {
-            // electron
-            l1.SetPtEtaPhiM(evt.d->Electron_PT[meta.l2_index], evt.d->Electron_Eta[meta.l2_index],
-                            evt.d->Electron_Phi[meta.l2_index], Me);
-        } else if (meta.l2flavor == 1)
-        {
-            // muon
-            l1.SetPtEtaPhiM(evt.d->Muon_PT[meta.l2_index], evt.d->Muon_Eta[meta.l2_index],
-                            evt.d->Muon_Phi[meta.l2_index], Mmu);
-        }
-        if (meta.l3flavor == 0) {
-            // electron
-            l2.SetPtEtaPhiM(evt.d->Electron_PT[meta.l3_index], evt.d->Electron_Eta[meta.l3_index],
-                            evt.d->Electron_Phi[meta.l3_index], Me);
-        } else if (meta.l3flavor == 1) {
-            // muon
-            l2.SetPtEtaPhiM(evt.d->Muon_PT[meta.l3_index], evt.d->Muon_Eta[meta.l3_index],
-                            evt.d->Muon_Phi[meta.l3_index], Mmu);
-        }
-        double z_mass = (l1 + l2).M();
-        meta.z_mass = z_mass;
-        meta.z_mass_diff = std::abs(z_mass - cfg.z_mass);
-        meta.z_flavor = meta.l2flavor; // same flavor for l2 and l3
+        // Optional: Update Z candidate to be the one with best recoil?
+        // Current logic in ZCandidateSelection uses Z mass window.
+        // If recoil selection is preferred, logic goes here.
         return true;
     }
     return false;
-    
-
-    // Approach 2: require m_recoil_1 > recoil_mass_min, if both m_recoil_1 and m_recoil_2 > recoil_mass_min, reject event
 }
+
+// Unused function -----------------------------------
+// Old Z to ll selection
+std::string ZToLLSelection::name() const { return "Z_to_ll"; }
+bool ZToLLSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
+    if (!evt.d) return false;
+    return true;
+}
+
 
 } // namespace hlfv
