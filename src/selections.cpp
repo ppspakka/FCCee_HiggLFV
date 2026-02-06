@@ -203,6 +203,11 @@ std::string LeptonSelection::name() const { return "LeptonSelection"; }
 bool LeptonSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg) {
     if (!evt.d) return false;
 
+    // save met
+    if (evt.d->MissingET_size > 0) {
+        meta.MET = evt.d->MissingET_MET[0];
+    }
+
     // Helper to extract passing leptons
     auto extract = [&](int n, const float* pts, const int* charges, int flav) {
         std::vector<LeptonObj> leps;
@@ -385,7 +390,124 @@ bool HCandidateSelection::apply(const Event& evt, Meta& meta, const Parameters& 
 
         }
     }
+    
 
+    // approach 2: from two candidates, assign one with highest pt to Z (careful about flavor) IGNORE ALL PREVIOUAS LOGIC
+    // int idx_cand1 = meta.l3_index;
+    // int idx_cand2 = meta.l4_index;
+    // double pt1 = (meta.l3flavor == ELECTRON) ? evt.d->Electron_PT[idx_cand1] : evt.d->Muon_PT[idx_cand1];
+    // double pt2 = (meta.l4flavor == ELECTRON) ? evt.d->Electron_PT[idx_cand2] : evt.d->Muon_PT[idx_cand2];
+    // if (pt1 >= pt2) {
+    //     best_h2_idx = idx_cand2;
+    //     z2_idx = idx_cand1;
+    // } else {
+    //     best_h2_idx = idx_cand1;
+    //     z2_idx = idx_cand2;
+    // }
+    // otherZ_idx = best_h2_idx;
+    // otherH_idx = z2_idx;
+
+    // appraoch 3: assign leptons with pt closest to z 1st candidate to z
+    // int idx_cand1 = meta.l3_index;
+    // int idx_cand2 = meta.l4_index;
+    // double pt1 = (meta.l3flavor == ELECTRON) ? evt.d->Electron_PT[idx_cand1] : evt.d->Muon_PT[idx_cand1];
+    // double pt2 = (meta.l4flavor == ELECTRON) ? evt.d->Electron_PT[idx_cand2] : evt.d->Muon_PT[idx_cand2];
+    // double z1_pt = (meta.z_flavor == ELECTRON) ? evt.d->Electron_PT[meta.z_l1] : evt.d->Muon_PT[meta.z_l1];
+    // if (std::abs(pt1 - z1_pt) <= std::abs(pt2 - z1_pt)) {
+    //     best_h2_idx = idx_cand2;
+    //     z2_idx = idx_cand1;
+    // } else {
+    //     best_h2_idx = idx_cand1;
+    //     z2_idx = idx_cand2;
+    // }
+    // otherZ_idx = best_h2_idx;
+    // otherH_idx = z2_idx;
+
+
+    // approach 4: identify whether l1 is prompt lepton based on deltaPhi with MET
+    // if DeltaPHi(l1, MET) < than threshold, then l1 is from tau decay -> assign hardest lepton to higgs>
+    // elif DeltaPhi(l1, MET) > threshold, then l1 is prompt lepton -> assign softest lepton to higgs
+    // else: reject event
+    // int idx_cand1 = meta.l3_index;
+    // int idx_cand2 = meta.l4_index;
+    // TLorentzVector v_l1 = get_p4(evt, meta.l1_index, meta.l1flavor);
+    // double dphi_l1_met = std::numeric_limits<double>::quiet_NaN();
+    // if (evt.d->MissingET_size > 0) {
+    //     double met_phi = evt.d->MissingET_Phi[0];
+    //     dphi_l1_met = delta_phi(v_l1.Phi(), met_phi);
+    // }
+    // double dphi_threshold_close = 0.3; // can be configured later
+    // double dphi_threshold_far = 2.0; // can be configured later
+    // double pt1 = (meta.l3flavor == ELECTRON) ? evt.d->Electron_PT[idx_cand1] : evt.d->Muon_PT[idx_cand1];
+    // double pt2 = (meta.l4flavor == ELECTRON) ? evt.d->Electron_PT[idx_cand2] : evt.d->Muon_PT[idx_cand2];
+    // if (dphi_l1_met < dphi_threshold_close) {
+    //     // l1 is from tau decay -> assign hardest lepton to higgs
+    //     if (pt1 >= pt2) {
+    //         best_h2_idx = idx_cand1;
+    //         z2_idx = idx_cand2;
+    //     } else {
+    //         best_h2_idx = idx_cand2;
+    //         z2_idx = idx_cand1;
+    //     }
+    // } else if (dphi_l1_met > dphi_threshold_far) {
+    //     // l1 is prompt lepton -> assign softest lepton to higgs
+    //     if (pt1 <= pt2) {
+    //         best_h2_idx = idx_cand1;
+    //         z2_idx = idx_cand2;
+    //     } else {
+    //         best_h2_idx = idx_cand2;
+    //         z2_idx = idx_cand1;
+    //     }
+    // } else {
+    //     // reject event
+    //     return false;
+    // }
+    // otherZ_idx = best_h2_idx;
+    // otherH_idx = z2_idx;
+
+    // // additional cut: require recoil mass > 145 GeV
+    // // compute recoil mass based on selected z candidate
+    // TLorentzVector p4_z_selected = get_p4(evt, meta.l2_index, meta.l2flavor) + 
+    //                                get_p4(evt, z2_idx, meta.l2flavor);
+    // double beam_E = ECM / 2.0; 
+    // TLorentzVector p_beam_total(0.0, 0.0, 0.0, ECM); // px, py, pz, E (approx for 0 crossing angle)
+    // TLorentzVector p_recoil = p_beam_total - p4_z_selected;
+    // double m_recoil = p_recoil.M();
+    // if (m_recoil < 145.0) {
+    //     return false;
+    // }
+
+    // approach 5: pT sorting
+    // sort: h candidate, l3, l4 by pT 
+    // if h is highest, pick softest for h2
+    // if h is lowest, pick hardest for h2
+    // if h is middle, reject event
+    // int idx_cand1 = meta.l3_index;
+    // int idx_cand2 = meta.l4_index;
+    // double pt_h1 = (meta.l1flavor == ELECTRON) ? evt.d->Electron_PT[idx_h1] : evt.d->Muon_PT[idx_h1];
+    // double pt1 = (meta.l3flavor == ELECTRON) ? evt.d->Electron_PT[idx_cand1] : evt.d->Muon_PT[idx_cand1];
+    // double pt2 = (meta.l4flavor == ELECTRON) ? evt.d->Electron_PT[idx_cand2] : evt.d->Muon_PT[idx_cand2];
+    // std::vector<std::pair<int, double>> vec = { {idx_h1, pt_h1}, {idx_cand1, pt1}, {idx_cand2, pt2} };
+    // // sort descending
+    // std::sort(vec.begin(), vec.end(), [](const std::pair<int, double>& a, const std::pair<int, double>& b) {
+    //     return a.second > b.second;
+    // });
+    // if (vec[0].first == idx_h1) {
+    //     // h is highest, pick softest for h2
+    //     best_h2_idx = vec[2].first;
+    //     z2_idx = vec[1].first;
+    // } else if (vec[2].first == idx_h1) {
+    //     // h is lowest, pick hardest for h2
+    //     best_h2_idx = vec[1].first;
+    //     z2_idx = vec[2].first;
+    // } else {
+    //     // h is middle, reject event
+    //     return false;
+    // }
+    // otherZ_idx = best_h2_idx;
+    // otherH_idx = z2_idx;
+    
+    // Final assignment
     if (best_h2_idx != -1) {
         meta.h_mu = (meta.l1flavor == MUON) ? meta.l1_index : best_h2_idx;
         meta.h_e  = (meta.l1flavor == ELECTRON) ? meta.l1_index : best_h2_idx;
@@ -456,6 +578,9 @@ bool HToMuTauESelection::apply(const Event& evt, Meta& meta, const Parameters& c
 
     meta.dphi_mu_e = std::abs(v_mu.DeltaPhi(v_e));
     meta.deltaR_mu_e = v_mu.DeltaR(v_e);
+
+    // test cut on m_z2, reject those within the range 86-96 GeV to reduce Z background
+    if (meta.m_z2 > 86.0 && meta.m_z2 < 96.0) return false;
 
     // Boosted kinematics
     TVector3 boost_vec(meta.beta_x, meta.beta_y, meta.beta_z);

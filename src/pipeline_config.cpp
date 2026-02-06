@@ -275,6 +275,10 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
         "m_h_invariant", "Invariant mass of 3 objects (GeV);M_{H inv} [GeV];Events", 200, 0.5, 200.5,
         [](const Event&, const Meta& m) -> double { return m.m_h_invariant; }
     });
+    vars.push_back({
+        "MET", "Missing Transverse Energy (GeV);MET [GeV];Events", 100, 0.0, 100.0,
+        [](const Event&, const Meta& m) -> double { return m.MET; }
+    });
 
     return vars;
 }
@@ -419,7 +423,14 @@ std::vector<HistogramManager::Var2DSpec> Variables::getDefault2D() {
         [](const Event&, const Meta& m) -> double { return m.h_mu_dz; },
         [](const Event&, const Meta& m) -> double { return m.m_collinear; }
     });
-
+    // recoil vs collinear mass
+    vars2d.push_back({
+        "m_recoil_vs_m_collinear", "M_{recoil} vs M_{collinear};M_{recoil} [GeV];M_{collinear} [GeV]",
+        200, 0.5, 200.5,
+        200, 0.5, 200.5,
+        [](const Event&, const Meta& m) -> double { return m.m_recoil; },
+        [](const Event&, const Meta& m) -> double { return m.m_collinear; }
+    });
 
     return vars2d;
 }

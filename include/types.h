@@ -97,6 +97,8 @@ struct Meta {
 
     // m_h reconstructed using invariant mass of 3 objects (2l from H + MET)
     double m_h_invariant = std::numeric_limits<double>::quiet_NaN();
+
+    double MET = std::numeric_limits<double>::quiet_NaN();
 };
 
 } // namespace hlfv
