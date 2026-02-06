@@ -29,7 +29,7 @@
     { "name": "z_candidate_selection",  "enabled": false },
     { "name": "h_candidate_selection",  "enabled": true },
 
-    { "name": "H_to_mutau_e",           "enabled": true },
+    { "name": "H_to_etau_mu",           "enabled": true },
 
     { "name": "MET_mu_dphi",               "enabled": true },
 
