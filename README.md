@@ -5,9 +5,9 @@
 ```bash
 root -l -b -q 'analyze_pipeline.cpp("PATH_TO_ROOT_FILE_OR_PATTERN","OUTPUT_ROOT_FILE","CONFIG_JSON_FILE")'
 ```
-- PATH_TO_ROOT_FILE_OR_PATTERN: e.g. `samples/HMuTauE_LFV_125.root` or `samples/` (to process all ROOT files in the directory)
-- OUTPUT_ROOT_FILE: e.g. `out_hist_cfg.root` contains the histograms after applying the pipeline selections
-- CONFIG_JSON_FILE: e.g. `pipeline.json` defines the selection pipeline and parameters
+- `PATH_TO_ROOT_FILE_OR_PATTERN`: e.g. `samples/HMuTauE_LFV_125.root` or `samples/` (to process all ROOT files in the directory)
+- `OUTPUT_ROOT_FILE`: e.g. `out_hist_cfg.root` contains the histograms after applying the pipeline selections
+- `CONFIG_JSON_FILE`: e.g. `pipeline.json` defines the selection pipeline and parameters
 
 ### How to add new selections
 
