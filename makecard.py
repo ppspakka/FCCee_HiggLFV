@@ -58,13 +58,6 @@ cross_sections_pb = {
     'HETauMu_LFV_155': signal_xsec,
     'HETauMu_LFV_160': signal_xsec,
     
-
-    # 'ZWW': 2.79708716e-06,          # Z->ll, W->lvlv
-    # 'HZFourLep': 2.714e-06,         # Z->ll, H->WW, WW->lvlv
-    # 'zz_ll_tautau': 1.52e-04,      # Z->ll, Z->tautau, tau -> muons/electrons
-    # 'zh_ll_ww': 7.84e-05,           # Z->ll, H->WW, WW->lvlv (only one mu and one e)
-    # 'zh_ll_tautau': 2.19e-05,       # Z->ll, H->tautau, tautau->muons/electrons
-    
     'zz_ll_tautau': 5.79e-04,      # Z->ll, Z->tautau, tau -> muons/electrons (corrected + ISR)
     'zh_ll_ww': 6.6e-05,           # Z->ll, H->WW, WW->lvlv (only one mu and one e) + ISR
     'zh_ll_tautau': 7.39611e-05,       # Z->ll, H->tautau, tautau->muons/electrons (corrected + ISR)
@@ -78,14 +71,6 @@ GLOBAL_UNC = {
     "lumi": 1.02,
 }
 
-# PROC_UNC is constructed dynamically for backgrounds with 2.0
-# Example shape for future extension:
-# PROC_UNC = {
-#     "PROC_NAME": {
-#         "UNC1": 1.05,
-#         "UNC2": 1.10,
-#     }
-# }
 # For now we will create {"bkg_unc": 2.0} for each background.
 BACKGROUND_UNC_NAME = "bkg_unc"
 BACKGROUND_UNC_VALUE = 1.3 # 30% uncertainty on backgrounds
@@ -409,6 +394,12 @@ def write_datacard_for_signal(
             bkg_yields.append(byield)
         # Print all yields
         info(f"Yields for datacard {signal_proc}: signal={signal_yield:.6g}, backgrounds={[f'{by:.6g}' for by in bkg_yields]}")
+        
+        # Calculate the observation as sum of backgrounds (rounded)
+        if observation == 0:
+            observation = int(round(sum(bkg_yields)))
+            info(f"Setting observation to sum of backgrounds: {observation}")
+        
         with open(card_path, "w") as dc:
             dc.write("imax 1 number of channels\n")
             dc.write("jmax * number of backgrounds\n")

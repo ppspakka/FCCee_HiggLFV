@@ -60,4 +60,9 @@ struct HCandidateSelection : public ISelection {
     bool apply(const Event& evt, Meta& meta, const Parameters& cfg) override;
 };
 
+struct HToMuESelection : public ISelection {
+    std::string name() const override;
+    bool apply(const Event& evt, Meta& meta, const Parameters& cfg) override;
+};
+
 } // namespace hlfv

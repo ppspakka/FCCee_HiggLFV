@@ -12,22 +12,15 @@
     "z_mass_window_lower": 10.0,
 
     "_comment3": "==== H -> mu tau_e cuts ====",
-    "mu_pt_min": 10.0,
-    "e_pt_min": 0.0,
-
-    "_comment4": "==== MET cuts ====",
-    "max_dphi_e_met": 0.1,
-    "max_dphi_mu_met": 0.1
+    "mu_pt_min": 0.0,
+    "e_pt_min": 0.0
   },
   "selections": [
     { "name": "lepton_selection",       "enabled": true },
 
     { "name": "z_candidate_selection",  "enabled": true },
-    { "name": "Z_to_ll",                "enabled": false },
 
-    { "name": "H_to_mutau_e",           "enabled": true },
-
-    { "name": "MET_e_dphi",               "enabled": true },
+    { "name": "H_to_mu_e",           "enabled": true },
 
     { "name": "finalstate_nocut",       "enabled": true }
   ]

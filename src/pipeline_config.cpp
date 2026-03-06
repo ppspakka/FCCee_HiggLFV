@@ -9,33 +9,25 @@
 
 namespace hlfv {
 
-// ---- selection factory ----
+// ---- selection factory ---- 
 std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
     std::string key = name;
     std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c){ return std::tolower(c); });
 
+    // Keep only 1st name
     if (key == "empty_selection") return std::make_unique<EmptySelection>();
-
-    if (key == "finalstate_nocut" || key == "final_state_nocut" || key == "finalstate-nocut") return std::make_unique<FinalState_NoCut>();
-
-    if (key == "lepton_selection" || key == "leptonselection") return std::make_unique<LeptonSelection>();
-
-    if (key == "z_candidate_selection" || key == "zcandidate_selection") return std::make_unique<ZCandidateSelection>();
-
-    if (key == "z_to_ll" || key == "z->ll" || key == "z_ll") return std::make_unique<ZToLLSelection>();
-
-    // H to mu tau_e
-    if (key == "h_to_mutau_e" || key == "h_to_mutaue" || key == "h_to_mue" || key == "h->mutau_e") return std::make_unique<HToMuTauESelection>();
-
+    if (key == "finalstate_nocut") return std::make_unique<FinalState_NoCut>();
+    if (key == "lepton_selection") return std::make_unique<LeptonSelection>();
+    if (key == "z_candidate_selection") return std::make_unique<ZCandidateSelection>();
+    if (key == "z_to_ll") return std::make_unique<ZToLLSelection>();
+    if (key == "h_to_mutau_e") return std::make_unique<HToMuTauESelection>();
     if (key == "h_to_etau_mu") return std::make_unique<HToETauMuSelection>();
-    
-    // if (key == "met_dphi" || key == "met-dphi" || key == "metdphi") return std::make_unique<METDphiSelection>();
-    if (key == "met_e_dphi" || key == "metedphi" || key == "met_e-dphi") return std::make_unique<METEDphiSelection>();
-    if (key == "met_mu_dphi" || key == "metmudphi" || key == "met_mu-dphi") return std::make_unique<METMuDphiSelection>();
+    if (key == "met_e_dphi") return std::make_unique<METEDphiSelection>();
+    if (key == "met_mu_dphi") return std::make_unique<METMuDphiSelection>();
+    if (key == "recoil_mass_selection") return std::make_unique<RecoilMassSelection>();
+    if (key == "h_candidate_selection") return std::make_unique<HCandidateSelection>();
+    if (key == "h_to_mu_e") return std::make_unique<HToMuESelection>();
 
-    if (key == "recoil_mass_selection" || key == "recoilmass_selection" || key == "recoil-mass-selection") return std::make_unique<RecoilMassSelection>();
-
-    if (key == "h_candidate_selection" || key == "hcandidate_selection" || key == "h-candidate-selection") return std::make_unique<HCandidateSelection>();
     return nullptr;
 }
 

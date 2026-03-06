@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 # Defaults
-DEFAULT_LUMI = "5"
+DEFAULT_LUMI = "1"
 DEFAULT_SEED = "1"
 # DEFAULT_QUANTILES = ["0.5"]  # For testing (only 0.5)
 DEFAULT_QUANTILES = ["0.5", "0.84", "0.16", "0.975", "0.025"]
@@ -80,6 +80,22 @@ def run_combine(datacard: Path, quantile: str, lumi: str, seed: str, logger):
     status_file.with_suffix(".Running").rename(status_file.with_suffix(".Complete"))
     return limit, output, res.returncode, datacard.name, quantile
 
+def cleanup(status_dir):
+    for root_file in Path(".").glob("higgsCombineTest.HybridNew*.root"):
+        root_file.unlink()
+
+    log_dir = Path("logs")
+    if log_dir.exists():
+        merged_log = log_dir / "merged.log"
+        with open(merged_log, "w") as mf:
+            for log_file in sorted(log_dir.glob("*.log")):
+                with open(log_file, "r") as lf:
+                    mf.write(f"--- {log_file.name} ---\n")
+                    mf.write(lf.read())
+                    mf.write("\n\n")
+        logger.info(f"Merged logs into {merged_log}")
+    shutil.rmtree(status_dir)
+
 def main():
     parser = argparse.ArgumentParser(description="Run combine on datacards with multithreading.")
     parser.add_argument("--lumi", default=DEFAULT_LUMI, help="Luminosity scale (default: 1)")
@@ -130,8 +146,9 @@ def main():
     with open(args.output, "w") as fp:
         json.dump(all_files, fp, indent=2, sort_keys=True)
     logger.info(f"Wrote {args.output}")
-
-    shutil.rmtree(status_dir)
+    
+    # Clean up intermediate files
+    cleanup(status_dir)
 
 if __name__ == "__main__":
     main()

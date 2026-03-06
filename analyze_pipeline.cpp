@@ -62,6 +62,8 @@ void analyze_pipeline(const char* inputPath = "samples/HMuTauE_LFV_125.root",
     chain->SetBranchStatus("Muon*", 1);
     chain->SetBranchStatus("Electron*", 1);
     chain->SetBranchStatus("MissingET*", 1);
+    // Enable Event Number for debugging
+    chain->SetBranchStatus("Event", 1);
 
     // Load pipeline config (JSON). Fallback to defaults if missing.
     PipelineConfig cfg;

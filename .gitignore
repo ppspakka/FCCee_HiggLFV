@@ -12,3 +12,8 @@ CutPython.py
 outputs/
 datacards_*/
 HLFV_paper/
+temp/
+analysis/
+junk/
+__pycache__/
+PythonTest.ipynb

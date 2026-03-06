@@ -234,7 +234,7 @@ def run_makecard_commands(args, dry_run: bool = False):
         },
     }
 
-    lumi_pb = 1_000_000
+    lumi_pb = 5_000_000
     failures = 0
 
     for name, params in makecard_jobs.items():

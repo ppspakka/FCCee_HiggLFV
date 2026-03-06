@@ -23,36 +23,42 @@ public :
 
 // Fixed size dimensions of array or collections stored in the TTree if any.
    static constexpr Int_t kMaxEvent = 1;
-   static constexpr Int_t kMaxWeight = 2;
-   static constexpr Int_t kMaxParticle = 10946;
+   static constexpr Int_t kMaxWeight = 20;               
+   static constexpr Int_t kMaxParticle = 15000;          
    static constexpr Int_t kMaxGenMissingET = 1;
-   static constexpr Int_t kMaxEFlowTrack = 1011;
-   static constexpr Int_t kMaxEFlowPhoton = 1102;
-   static constexpr Int_t kMaxEFlowNeutralHadron = 742;
-   static constexpr Int_t kMaxPhoton = 11;
-   static constexpr Int_t kMaxElectron = 3;
-   static constexpr Int_t kMaxMuon = 4;
-   static constexpr Int_t kMaxJet = 26;
-   static constexpr Int_t kMaxPhotonNoIso = 122;
-   static constexpr Int_t kMaxElectronNoIso = 6;
-   static constexpr Int_t kMaxMuonNoIso = 5;
-   static constexpr Int_t kMaxJetNoIso = 26;
-   static constexpr Int_t kMaxGenJet02 = 13;
-   static constexpr Int_t kMaxGenJet04 = 26;
-   static constexpr Int_t kMaxGenJet08 = 33;
-   static constexpr Int_t kMaxGenJet15 = 17;
-   static constexpr Int_t kMaxParticleFlowJet02 = 12;
-   static constexpr Int_t kMaxParticleFlowJet04 = 26;
-   static constexpr Int_t kMaxParticleFlowJet08 = 34;
-   static constexpr Int_t kMaxParticleFlowJet15 = 16;
-   static constexpr Int_t kMaxCaloJet02 = 10;
-   static constexpr Int_t kMaxCaloJet04 = 17;
-   static constexpr Int_t kMaxCaloJet08 = 33;
-   static constexpr Int_t kMaxCaloJet15 = 15;
-   static constexpr Int_t kMaxTrackJet02 = 10;
-   static constexpr Int_t kMaxTrackJet04 = 10;
-   static constexpr Int_t kMaxTrackJet08 = 20;
-   static constexpr Int_t kMaxTrackJet15 = 13;
+   static constexpr Int_t kMaxEFlowTrack = 4000;         
+   static constexpr Int_t kMaxEFlowPhoton = 4000;
+   static constexpr Int_t kMaxEFlowNeutralHadron = 2000;
+
+   // -- Leptons & Photons --
+   static constexpr Int_t kMaxPhoton = 50;
+   static constexpr Int_t kMaxElectron = 50;             
+   static constexpr Int_t kMaxMuon = 50;
+   static constexpr Int_t kMaxPhotonNoIso = 200;         
+   static constexpr Int_t kMaxElectronNoIso = 100;
+   static constexpr Int_t kMaxMuonNoIso = 100;
+
+   // -- Jets (All algorithms) --
+   static constexpr Int_t kMaxJet = 150;
+   static constexpr Int_t kMaxJetNoIso = 150;
+   static constexpr Int_t kMaxGenJet02 = 100;
+   static constexpr Int_t kMaxGenJet04 = 150;
+   static constexpr Int_t kMaxGenJet08 = 100;
+   static constexpr Int_t kMaxGenJet15 = 100;
+   static constexpr Int_t kMaxParticleFlowJet02 = 100;
+   static constexpr Int_t kMaxParticleFlowJet04 = 150;
+   static constexpr Int_t kMaxParticleFlowJet08 = 100;
+   static constexpr Int_t kMaxParticleFlowJet15 = 100;
+   static constexpr Int_t kMaxCaloJet02 = 100;
+   static constexpr Int_t kMaxCaloJet04 = 150;
+   static constexpr Int_t kMaxCaloJet08 = 100;
+   static constexpr Int_t kMaxCaloJet15 = 100;
+   static constexpr Int_t kMaxTrackJet02 = 100;
+   static constexpr Int_t kMaxTrackJet04 = 150;
+   static constexpr Int_t kMaxTrackJet08 = 100;
+   static constexpr Int_t kMaxTrackJet15 = 100;
+
+   // -- Global Event Variables --
    static constexpr Int_t kMaxMissingET = 1;
    static constexpr Int_t kMaxScalarHT = 1;
 
