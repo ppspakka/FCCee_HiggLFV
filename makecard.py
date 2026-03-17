@@ -34,29 +34,6 @@ for key in factors:
     signal_xsec *= factors[key]
 
 cross_sections_pb = {
-    'HMuTauE_LFV_110': signal_xsec,
-    'HMuTauE_LFV_115': signal_xsec,
-    'HMuTauE_LFV_120': signal_xsec,
-    'HMuTauE_LFV_125': signal_xsec,
-    'HMuTauE_LFV_130': signal_xsec,
-    'HMuTauE_LFV_135': signal_xsec,
-    'HMuTauE_LFV_140': signal_xsec,
-    'HMuTauE_LFV_145': signal_xsec,
-    'HMuTauE_LFV_150': signal_xsec,
-    'HMuTauE_LFV_155': signal_xsec,
-    'HMuTauE_LFV_160': signal_xsec,
-    
-    'HETauMu_LFV_110': signal_xsec, 
-    'HETauMu_LFV_115': signal_xsec,
-    'HETauMu_LFV_120': signal_xsec,
-    'HETauMu_LFV_125': signal_xsec,
-    'HETauMu_LFV_130': signal_xsec,
-    'HETauMu_LFV_135': signal_xsec,
-    'HETauMu_LFV_140': signal_xsec,
-    'HETauMu_LFV_145': signal_xsec,
-    'HETauMu_LFV_150': signal_xsec,
-    'HETauMu_LFV_155': signal_xsec,
-    'HETauMu_LFV_160': signal_xsec,
     
     'zz_ll_tautau': 5.79e-04,      # Z->ll, Z->tautau, tau -> muons/electrons (corrected + ISR)
     'zh_ll_ww': 6.6e-05,           # Z->ll, H->WW, WW->lvlv (only one mu and one e) + ISR
@@ -64,6 +41,13 @@ cross_sections_pb = {
     'zww': 3.53e-06,          # Z->ll, W->lvlv + ISR
     'vbs': 3.91e-06,          # vector boson scattering + ISR
 }
+
+# Generate signal cross-sections (up to 240 GeV)
+for mass in range(165, 241, 5):
+    proc_name_mutau = f"HMuTauE_LFV_{mass}"
+    proc_name_etamu = f"HETauMu_LFV_{mass}"
+    cross_sections_pb[proc_name_mutau] = signal_xsec
+    cross_sections_pb[proc_name_etamu] = signal_xsec
 
 # Uncertainties framework (editable)
 GLOBAL_UNC = {
