@@ -208,6 +208,9 @@ bool LeptonSelection::apply(const Event& evt, Meta& meta, const Parameters& cfg)
         meta.MET = evt.d->MissingET_MET[0];
     }
 
+    // ----- Stricter all leptons must equal 4 ------
+    if ((evt.d->Electron_size + evt.d->Muon_size) != 4) return false;
+
     // Helper to extract passing leptons
     auto extract = [&](int n, const float* pts, const int* charges, int flav) {
         std::vector<LeptonObj> leps;
@@ -499,7 +502,7 @@ bool PT_ZCandidateSelection::apply(const Event& evt, Meta& meta, const Parameter
     meta.z_flavor = (meta.l1flavor == ELECTRON) ? MUON : ELECTRON;
     TLorentzVector h1_p4 = get_p4(evt, meta.l1_index, meta.l1flavor);
     // ---------- PT cut on the singleton ----------
-    if (h1_p4.Pt() < (meta.l1flavor == ELECTRON ? cfg.e_pt_min : cfg.mu_pt_min)) {return false;}
+    if (h1_p4.Pt() <= (meta.l1flavor == ELECTRON ? cfg.e_pt_min : cfg.mu_pt_min)) {return false;}
     TLorentzVector z1_p4 = get_p4(evt, meta.l2_index, meta.l2flavor);
     vector<TLorentzVector> z_candidates;
     vector<float> z_candidate_masses;
