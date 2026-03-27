@@ -174,7 +174,7 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
         [](const Event&, const Meta& m) -> double { return m.dphi_mu_e; }
     });
     vars.push_back({
-        "m_collinear", "Collinear mass (GeV);M_{collinear} [GeV];Events", 250, 0.5, 250.5,
+        "m_collinear", "Collinear mass (GeV);M_{collinear} [GeV];Events", 250, 0.0, 250,
         [](const Event&, const Meta& m) -> double { return m.m_collinear; }
     });
     vars.push_back({
