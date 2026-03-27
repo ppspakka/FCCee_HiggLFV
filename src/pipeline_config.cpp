@@ -28,6 +28,7 @@ std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
     if (key == "h_candidate_selection") return std::make_unique<HCandidateSelection>();
     if (key == "h_to_mu_e") return std::make_unique<HToMuESelection>();
     if (key == "pt_z_candidate_selection") return std::make_unique<PT_ZCandidateSelection>();
+    if (key == "modified_z_candidate_selection") return std::make_unique<Modified_ZCandidateSelection>();
 
     return nullptr;
 }

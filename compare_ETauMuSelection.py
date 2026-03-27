@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-#SBATCH --job-name=offsel
+#SBATCH --job-name=etamu_sel
 #SBATCH --qos=cu_hpc
 #SBATCH --partition=cpugpu
 #SBATCH --ntasks=1
-#SBATCH --output=sbatch.log
+#SBATCH --output=sbatch_etamu_sel.log
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=64G
 
@@ -12,17 +12,10 @@ import subprocess
 import concurrent.futures
 
 # 1. Define Base Directories
-ROOTFiles_DIR = "/work/project/escience/ruttho/FCC-ee_SimpleDelphesAnalysis/EventSample/ISR_HEMu_LFV/"
+ROOTFiles_DIR = "/work/project/physics/psriling/FCC/FCCee/ISR_HETauMu_LFV/"
 PPor_Dir = "/work/project/physics/psriling/FCC/FCCee/"
 Ptop_Dir = "/work/project/physics/vwachira/fcc-ee-higgs-lfv/delphes_outputs/"
 
-# 2. Define Signal and Background Arrays
-# SIGNAL_DIRS = [
-#     f"{ROOTFiles_DIR}Hmass110/ROOT/", f"{ROOTFiles_DIR}Hmass115/ROOT/", f"{ROOTFiles_DIR}Hmass120/ROOT/",
-#     f"{ROOTFiles_DIR}Hmass125/ROOT/", f"{ROOTFiles_DIR}Hmass130/ROOT/", f"{ROOTFiles_DIR}Hmass135/ROOT/",
-#     f"{ROOTFiles_DIR}Hmass140/ROOT/", f"{ROOTFiles_DIR}Hmass145/ROOT/", f"{ROOTFiles_DIR}Hmass150/ROOT/",
-#     f"{ROOTFiles_DIR}Hmass155/ROOT/", f"{ROOTFiles_DIR}Hmass160/ROOT/"
-# ]
 
 BACKGROUND_DIRS = [
     f"{PPor_Dir}ISR_vbs/ROOT/", f"{PPor_Dir}ISR_zh_ll_tautau/ROOT/", f"{PPor_Dir}ISR_zh_ll_ww/ROOT/",
@@ -64,8 +57,8 @@ def run_analysis(file_dir, res_name, phsp, suffix):
     print(f"--> Starting job: {res_name}")
     
     # Prepare the ROOT C++ command
-    config_json = f"../pipeline_mue_{phsp}{suffix}.json"
-    root_cmd = f'root -l -b -q "../analyze_pipeline.cpp(\\"{file_dir}\\", \\"{res_name}_{phsp}Hist.root\\", \\"{config_json}\\")"'
+    config_json = f"../../pipeline_etaumu_{phsp}{suffix}.json"
+    root_cmd = f'root -l -b -q "../../analyze_pipeline.cpp(\\"{file_dir}\\", \\"{res_name}_{phsp}Hist.root\\", \\"{config_json}\\")"'
     full_cmd = f"{env_setup}\n{root_cmd}"
     
     # Open the log file using a context manager (the 'with' block ensures it closes safely)
@@ -80,9 +73,10 @@ def run_analysis(file_dir, res_name, phsp, suffix):
 if __name__ == "__main__":
     output_dir1 = "MasstoPT_Selection"
     output_dir2 = "PTtoMass_Selection"
+    os.makedirs("ETauMu_Selection", exist_ok=True)
+    os.chdir("ETauMu_Selection")
     os.makedirs(output_dir1, exist_ok=True)
     os.makedirs(output_dir2, exist_ok=True)
-    os.chdir(output_dir1) # Start in the first output directory for the 21To81 selection
 
     # Set to 10 to match your #SBATCH --cpus-per-task=10
     MAX_WORKERS = 10 
@@ -99,48 +93,48 @@ if __name__ == "__main__":
         os.chdir(output_dir1) # Start in the first output directory for the 21To81 selection
         # Backgroud jobs
         for f_dir, r_name in zip(BACKGROUND_DIRS, BACKGROUND_NAMES):
-            future = executor.submit(run_analysis, f_dir, r_name, "21T81", "")
-            future = executor.submit(run_analysis, f_dir, r_name, "81T101", "")
+            future = executor.submit(run_analysis, f_dir, r_name, "21To81", "")
+            future = executor.submit(run_analysis, f_dir, r_name, "81To101", "")
             futures.append(future)
         
         # Higgstranlung jobs
-        for i in range(110, 165, 5):
+        for i in range(110, 220, 5):
             res_name = f"HLFV_{i}GeV"
             f_dir = f"{ROOTFiles_DIR}Hmass{i}/ROOT/"
-            future = executor.submit(run_analysis, f_dir, res_name, "21T81", "")
-            future = executor.submit(run_analysis, f_dir, res_name, "81T101", "")
+            future = executor.submit(run_analysis, f_dir, res_name, "21To81", "")
+            future = executor.submit(run_analysis, f_dir, res_name, "81To101", "")
             futures.append(future)
 
         # VBF jobs
-        for j in range(110, 240, 5):
+        for j in range(110, 245, 5):
             res_name = f"VBF_HLFV_{j}GeV"
-            f_dir = f"{Ptop_Dir}mh{j}_emu/"
-            future = executor.submit(run_analysis, f_dir, res_name, "21T81", "")
-            future = executor.submit(run_analysis, f_dir, res_name, "81T101", "")
+            f_dir = f"{Ptop_Dir}mh{j}_etau/" # mh240_etau
+            future = executor.submit(run_analysis, f_dir, res_name, "21To81", "")
+            future = executor.submit(run_analysis, f_dir, res_name, "81To101", "")
             futures.append(future)
 
         # ------------ PT to Mass jobs ------------
         os.chdir("../" + output_dir2) # Switch to the second output directory for the 81To101 selection
         # Backgroud jobs
         for f_dir, r_name in zip(BACKGROUND_DIRS, BACKGROUND_NAMES):
-            future = executor.submit(run_analysis, f_dir, r_name, "21T81", "_PTthenMass")
-            future = executor.submit(run_analysis, f_dir, r_name, "81T101", "_PTthenMass")
+            future = executor.submit(run_analysis, f_dir, r_name, "21To81", "_PTthenMass")
+            future = executor.submit(run_analysis, f_dir, r_name, "81To101", "_PTthenMass")
             futures.append(future)
 
         # Higgstranlung jobs
-        for i in range(110, 165, 5):
+        for i in range(110, 220, 5):
             res_name = f"HLFV_{i}GeV"
             f_dir = f"{ROOTFiles_DIR}Hmass{i}/ROOT/"
-            future = executor.submit(run_analysis, f_dir, res_name, "21T81", "_PTthenMass")
-            future = executor.submit(run_analysis, f_dir, res_name, "81T101", "_PTthenMass")
+            future = executor.submit(run_analysis, f_dir, res_name, "21To81", "_PTthenMass")
+            future = executor.submit(run_analysis, f_dir, res_name, "81To101", "_PTthenMass")
             futures.append(future)
 
         # VBF jobs
-        for j in range(110, 240, 5):
+        for j in range(110, 245, 5):
             res_name = f"VBF_HLFV_{j}GeV"
-            f_dir = f"{Ptop_Dir}mh{j}_emu/"
-            future = executor.submit(run_analysis, f_dir, res_name, "21T81", "_PTthenMass")
-            future = executor.submit(run_analysis, f_dir, res_name, "81T101", "_PTthenMass")
+            f_dir = f"{Ptop_Dir}mh{j}_etau/" # mh240_etau
+            future = executor.submit(run_analysis, f_dir, res_name, "21To81", "_PTthenMass")
+            future = executor.submit(run_analysis, f_dir, res_name, "81To101", "_PTthenMass")
             futures.append(future)
 
         # as_completed yields futures as soon as they finish, allowing us to monitor progress
