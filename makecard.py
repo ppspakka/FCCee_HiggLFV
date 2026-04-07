@@ -33,7 +33,8 @@ factors = {
 
 channel_map = {
     "etau": "ETauMu",
-    "mutau": "MuTauE"
+    "mutau": "MuTauE",
+    "mue": "MuE"
 }
 
 # --- Load JSON Data ---
@@ -54,6 +55,7 @@ for key, xsec in all_xsecs.items():
         if key.startswith(SIGNAL_TYPE):
             # re.search finds the channel and mass regardless of the prefix (ZH_ll_ or VBF_)
             match = re.search(r"(etau|mutau)(\d+)", key)
+            match_mutaue = re.search(r"mutau(\d+)", key)
             
             if match:
                 channel_raw, mass = match.groups()
@@ -61,7 +63,7 @@ for key, xsec in all_xsecs.items():
                 proc_name = f"H{channel_name}_LFV_{mass}"
                 
                 # Base scaling
-                scaled_xsec = xsec * factors['TauToLep']
+                scaled_xsec = xsec
                 
                 # Mass-dependent scaling
                 mass_int = int(mass)
@@ -72,7 +74,11 @@ for key, xsec in all_xsecs.items():
                 elif 200 <= mass_int <= 240:
                     scaled_xsec *= 1.0
                     
-                signal_xsec_pb[proc_name] = scaled_xsec
+                if match_mutaue:
+                    mue_proc_name = f"HMuE_LFV_{mass}"
+                    signal_xsec_pb[mue_proc_name] = scaled_xsec
+
+                signal_xsec_pb[proc_name] = scaled_xsec * factors['TauToLep'] # Scale for tau->lepton branching
     else:
         # Treat all non-signal keys (zz_ll_tautau, zh_ll_ww, etc.) as backgrounds
         cross_sections_pb[key] = xsec
