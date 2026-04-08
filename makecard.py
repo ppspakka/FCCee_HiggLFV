@@ -67,9 +67,9 @@ for key, xsec in all_xsecs.items():
                 
                 # Mass-dependent scaling
                 mass_int = int(mass)
-                if 110 <= mass_int <= 140:
+                if 110 <= mass_int <= 145:
                     scaled_xsec *= 1e-4
-                elif 145 <= mass_int <= 195:
+                elif 145 < mass_int <= 195:
                     scaled_xsec *= 1e-2
                 elif 200 <= mass_int <= 240:
                     scaled_xsec *= 1.0

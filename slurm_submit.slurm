@@ -33,7 +33,7 @@ cmsset
 
 #./runall.sh
 # python3 -u runall_twoRegion.py -p 32 -o ZH_110To220_integerBin --skip-sbatch --skip-run
-python3 -u runall_twoRegion_NEW.py -p 32 -o ZH_110To220_integerBin_V1 --skip-run
+python3 -u runall_twoRegion_NEW.py -p 32 -o ZH_110To220_integerBin_V1 --skip-run --skip-sbatch
 
 # VBF sample
 #python3 -u runall_twoRegion_VBF.py -p 21 -o VBF_165To240_17Mar26 --skip-run
