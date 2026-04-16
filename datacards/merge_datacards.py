@@ -10,7 +10,7 @@ def main():
     parser.add_argument("--submit", action="store_true", help="Submit sbatch jobs after merging.")
     args = parser.parse_args()
 
-    channels = ['etaumu', 'mutaue']
+    channels = ['etaumu', 'mutaue', 'mue'] 
     
     # Create an isolated environment for Combine scripts
     combine_env = os.environ.copy()

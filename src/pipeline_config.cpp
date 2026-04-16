@@ -27,6 +27,9 @@ std::unique_ptr<ISelection> makeSelectionByName(const std::string& name) {
     if (key == "recoil_mass_selection") return std::make_unique<RecoilMassSelection>();
     if (key == "h_candidate_selection") return std::make_unique<HCandidateSelection>();
     if (key == "h_to_mu_e") return std::make_unique<HToMuESelection>();
+    if (key == "pt_z_candidate_selection") return std::make_unique<PT_ZCandidateSelection>();
+    if (key == "modified_z_candidate_selection") return std::make_unique<Modified_ZCandidateSelection>();
+    if (key == "no_ptmin_z_candidate_selection") return std::make_unique<NoPTMin_ZCandidateSelection>();
 
     return nullptr;
 }
@@ -264,7 +267,11 @@ std::vector<HistogramManager::VarSpec> Variables::getDefault() {
 
     // invariant mass of 3 objects (2l from H + MET)
     vars.push_back({
-        "m_h_invariant", "Invariant mass of 3 objects (GeV);M_{H inv} [GeV];Events", 250, 0.5, 250.5,
+        "m_h_invariant_show", "Invariant mass of 3 objects (GeV);M_{H inv} [GeV];Events", 250, 0.5, 250.5,
+        [](const Event&, const Meta& m) -> double { return m.m_h_invariant; }
+    });
+    vars.push_back({
+        "m_h_invariant_count", "Invariant mass of 3 objects (GeV);M_{H inv} [GeV];Events", 250, 0, 250,
         [](const Event&, const Meta& m) -> double { return m.m_h_invariant; }
     });
     vars.push_back({

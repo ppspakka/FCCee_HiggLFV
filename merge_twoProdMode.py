@@ -4,9 +4,8 @@ import math
 
 # --- Configuration ---
 DATACARD_PATH = {
-    'ZH': './ZH_testMakeCard',
-    'VBF': './VBF_testMakeCard',
-    # 'ggH': './ggH_...', # Easily expandable
+    'ZH': './ZH_110To220_integerBin',
+    'VBF': './VBF_110To220_integerBin'
 }
 OUTPUT_BASE = './Merged_ZH_VBF_110To220'
 

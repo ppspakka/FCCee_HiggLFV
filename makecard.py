@@ -33,52 +33,61 @@ factors = {
 
 channel_map = {
     "etau": "ETauMu",
-    "mutau": "MuTauE"
+    "mutau": "MuTauE",
+    "mue": "MuE"
 }
 
-# --- Load JSON Data ---
-with open(JSON_PATH, "r") as jf:
-    all_xsecs = json.load(jf)
+def get_xsec(SIGNAL_TYPE):
+    # --- Load JSON Data ---
+    with open(JSON_PATH, "r") as jf:
+        all_xsecs = json.load(jf)
 
-cross_sections_pb = {}
-signal_xsec_pb = {}
+    cross_sections_pb = {}
+    signal_xsec_pb = {}
 
-# --- Parse JSON ---
-for key, xsec in all_xsecs.items():
-    
-    # Identify if the key is a signal (starts with ZH_ or VBF_)
-    is_signal = key.startswith("ZH_") or key.startswith("VBF_")
-    
-    if is_signal:
-        # Only process if it matches the desired SIGNAL_TYPE, ignore the other
-        if key.startswith(SIGNAL_TYPE):
-            # re.search finds the channel and mass regardless of the prefix (ZH_ll_ or VBF_)
-            match = re.search(r"(etau|mutau)(\d+)", key)
-            
-            if match:
-                channel_raw, mass = match.groups()
-                channel_name = channel_map.get(channel_raw, channel_raw)
-                proc_name = f"H{channel_name}_LFV_{mass}"
+    # --- Parse JSON ---
+    for key, xsec in all_xsecs.items():
+        
+        # Identify if the key is a signal (starts with ZH_ or VBF_)
+        is_signal = key.startswith("ZH_") or key.startswith("VBF_")
+        
+        if is_signal:
+            # Only process if it matches the desired SIGNAL_TYPE, ignore the other
+            if key.startswith(SIGNAL_TYPE):
+                # re.search finds the channel and mass regardless of the prefix (ZH_ll_ or VBF_)
+                match = re.search(r"(etau|mutau)(\d+)", key)
+                match_mutaue = re.search(r"mutau(\d+)", key)
                 
-                # Base scaling
-                scaled_xsec = xsec * factors['TauToLep']
-                
-                # Mass-dependent scaling
-                mass_int = int(mass)
-                if 110 <= mass_int <= 140:
-                    scaled_xsec *= 1e-4
-                elif 145 <= mass_int <= 195:
-                    scaled_xsec *= 1e-2
-                elif 200 <= mass_int <= 240:
-                    scaled_xsec *= 1.0
+                if match:
+                    channel_raw, mass = match.groups()
+                    channel_name = channel_map.get(channel_raw, channel_raw)
+                    proc_name = f"H{channel_name}_LFV_{mass}"
                     
-                signal_xsec_pb[proc_name] = scaled_xsec
-    else:
-        # Treat all non-signal keys (zz_ll_tautau, zh_ll_ww, etc.) as backgrounds
-        cross_sections_pb[key] = xsec
+                    # Base scaling
+                    scaled_xsec = xsec
+                    
+                    # Mass-dependent scaling
+                    mass_int = int(mass)
+                    if 110 <= mass_int <= 145:
+                        scaled_xsec *= 1e-4
+                    elif 145 < mass_int <= 190:
+                        scaled_xsec *= 1e-2
+                    elif 195 <= mass_int <= 240:
+                        scaled_xsec *= 1.0
+                        
+                    if match_mutaue:
+                        mue_proc_name = f"HMuE_LFV_{mass}"
+                        signal_xsec_pb[mue_proc_name] = scaled_xsec
 
-# Combine backgrounds and the parsed/scaled signals
-cross_sections_pb.update(signal_xsec_pb)
+                    signal_xsec_pb[proc_name] = scaled_xsec * factors['TauToLep'] # Scale for tau->lepton branching
+        else:
+            # Treat all non-signal keys (zz_ll_tautau, zh_ll_ww, etc.) as backgrounds
+            cross_sections_pb[key] = xsec
+
+    # Combine backgrounds and the parsed/scaled signals
+    cross_sections_pb.update(signal_xsec_pb)
+
+    return cross_sections_pb
 
 
 # Uncertainties framework (editable)
@@ -460,6 +469,7 @@ def main():
     parser.add_argument("--final-hist-pattern", default=DEFAULT_FINAL_HIST_REGEX, help="Regex for selecting the final histogram")
     parser.add_argument("--xsec-json", default=None, help="Optional JSON file to override/extend cross sections dict")
     parser.add_argument("--rebin-json", default=None, help="Optional JSON with variable bin edges: {'bin1': [edges...]}")
+    parser.add_argument("--signal-type", type=str, choices=["ZH", "VBF"], default=SIGNAL_TYPE, help="Type of signal to process (ZH or VBF)")
     args = parser.parse_args()
 
     in_dir = args.in_dir
@@ -472,6 +482,7 @@ def main():
         die(f"Input directory not found: {in_dir}")
 
     # Cross-section map
+    cross_sections_pb = get_xsec(args.signal_type)
     xsec_map = dict(cross_sections_pb)
     if args.xsec_json:
         if not os.path.isfile(args.xsec_json):

@@ -8,6 +8,9 @@
 #include <limits>
 #include <cmath>
 
+#include "TRef.h"
+#include "TRefArray.h"
+#include "TLorentzVector.h"
 #include "Delphes.C"
 #include <TChain.h>
 #include <TFile.h>
@@ -15,6 +18,7 @@
 #include <TString.h>
 #include <TSystem.h>
 #include <fstream>
+
 
 using namespace std;
 
@@ -171,4 +175,5 @@ void analyze_pipeline(const char* inputPath = "samples/HMuTauE_LFV_125.root",
     }
     printf("Output written to: %s\n", outputPath);
     printf("===============================\n");
+    gSystem->Exit(0); // ensure ROOT macro exits cleanly
 }

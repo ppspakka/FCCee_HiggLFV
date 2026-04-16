@@ -6,14 +6,14 @@
     "lepton_pt_min": 1.0,
 
     "_comment2": "==== Z -> ll cuts ====",
-    "z_mass": 91,
+    "z_mass": 81,
     "zl_pt_min": 0.0,
-    "z_mass_window_upper": 10.0,
-    "z_mass_window_lower": 10.0,
+    "z_mass_window_upper": 0.0,
+    "z_mass_window_lower": 60.0,
 
     "_comment3": "==== H -> mu tau_e cuts ====",
-    "mu_pt_min": 0.0,
-    "e_pt_min": 0.0
+    "mu_pt_min": 10.0,
+    "e_pt_min": 10.0
   },
   "selections": [
     { "name": "lepton_selection",       "enabled": true },
