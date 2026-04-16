@@ -1,5 +1,6 @@
 import os
 import glob
+import re
 from typing import List, Dict, Any, Union, Optional
 
 import ROOT
@@ -7,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mplhep as hep
 from matplotlib.colors import LogNorm
+import uproot
 
 # Numpy-backed histogram wrappers (project-specific)
 from numpy_hist import NumpyHist1D, NumpyHist2D
@@ -96,15 +98,17 @@ def find_histogram_names_multiple_keywords(all_names: List[str],
         raise ValueError(f"Expected exactly one match for keywords '{keywords}', found {len(matched)}.")
     return matched
 
-
 def read_root_histograms(outdir: str = "outdir",
                          pattern: str = "*.root",
-                         blacklist: List[str] = []) -> Dict[str, Dict[str, Any]]:
+                         blacklist: List[str] = [],
+                         optimize: bool = False,
+                         load2D_hist: bool = True) -> Dict[str, Dict[str, Any]]:
     """Read top-level histograms from ROOT files and convert to numpy-backed wrappers.
 
-    Returns dict: { file_base_name: { histname: NumpyHist1D/2D, ... }, ... }
+    If optimize=True, only reads histograms starting with '01_' and the latest 'XX_'.
     """
     result: Dict[str, Dict[str, Any]] = {}
+    # Assuming ROOT is already imported in your environment
     ROOT.gROOT.SetBatch(True)
 
     paths = sorted(glob.glob(os.path.join(outdir, pattern)))
@@ -128,30 +132,181 @@ def read_root_histograms(outdir: str = "outdir",
             f.Close()
             continue
 
-        for key in keys:
+        # --- Optimization Logic ---
+        target_keys = keys
+        if optimize:
+            all_names = [k.GetName() for k in keys]
+            
+            # Extract numeric prefixes (e.g., '01', '02') from names like '00_histname'
+            prefixes = []
+            for name in all_names:
+                match = re.match(r"^(\d+)_", name)
+                if match:
+                    prefixes.append(match.group(1))
+            
+            if prefixes:
+                latest_step = max(prefixes, key=lambda x: int(x))
+                allowed_prefixes = ("00_", f"{latest_step}_")
+                
+                # Filter keys based on the identified prefixes
+                target_keys = [k for k in keys if k.GetName().startswith(allowed_prefixes)]
+        # ---------------------------
+
+        for key in target_keys:
             obj = key.ReadObj()
             if not obj:
                 continue
 
+            name = obj.GetName()
+
             # check TH2 before TH1 because TH2 inherits from TH1
-            if obj.InheritsFrom("TH2"):
+            if obj.InheritsFrom("TH2") and load2D_hist:
                 try:
                     h = NumpyHist2D.from_root_th2(obj)
                 except Exception as e:
-                    print(f"Warning: failed to convert 2D histogram '{obj.GetName()}': {e}")
+                    print(f"Warning: failed to convert 2D histogram '{name}': {e}")
                     continue
-                result[fname][obj.GetName()] = h
+                result[fname][name] = h
             elif obj.InheritsFrom("TH1"):
                 try:
                     h = NumpyHist1D.from_root_th1(obj)
                 except Exception as e:
-                    print(f"Warning: failed to convert histogram '{obj.GetName()}': {e}")
+                    print(f"Warning: failed to convert histogram '{name}': {e}")
                     continue
-                result[fname][obj.GetName()] = h
+                result[fname][name] = h
+
+            # Tell C++ to delete the object from RAM, then remove the Python proxy
+            obj.Delete() 
+            del obj
+
 
         f.Close()
     return result
 
+
+def read_root_histograms_uproot(outdir: str = "outdir",
+                                pattern: str = "*.root",
+                                blacklist: list = [],
+                                optimize_first_and_last: bool = False,
+                                optimize_skip_empty: bool = False,
+                                load2D_hist: bool = True,
+                                verbose: bool = True) -> Dict[str, Dict[str, Any]]:
+    import tqdm
+
+    result = {}
+    paths = sorted(glob.glob(os.path.join(outdir, pattern)))
+    
+    # Exclude blacklisted paths from the count
+    paths = [p for p in paths if not any(bl in p for bl in blacklist)]
+    
+    if verbose: 
+        print(f"Found {len(paths)} ROOT files matching pattern '{pattern}' in '{outdir}'.")
+
+    # Wrapped the paths with tqdm for the progress bar
+    for path in tqdm.tqdm(paths, desc="Reading ROOT files", disable=not verbose):
+        # Note: If verbose is True, this print might conflict with the progress bar UI. 
+        # Using tqdm.write(path) is usually preferred over print() to avoid line breaks.
+        # if verbose: 
+        #     tqdm.tqdm.write(f"Processing: {path}")
+
+        fname = os.path.splitext(os.path.basename(path))[0]
+        result[fname] = {}
+
+        # uproot.open automatically handles file closing using the 'with' statement
+        with uproot.open(path) as f:
+            # cycle=False removes the ';1' version tags from keys
+            keys = f.keys(cycle=False) 
+            if not keys:
+                continue
+
+            # --- Your Optimization Logic (Unchanged) ---
+            target_keys = keys
+            if optimize_first_and_last:
+                prefixes = []
+                for name in keys:
+                    match = re.match(r"^(\d+)_", name)
+                    if match:
+                        prefixes.append(match.group(1))
+                
+                if prefixes:
+                    latest_step = max(prefixes, key=lambda x: int(x))
+                    allowed_prefixes = ("00_", f"{latest_step}_")
+                    target_keys = [k for k in keys if k.startswith(allowed_prefixes)]
+            # ---------------------------
+
+            for key in target_keys:
+                try:
+                    obj = f[key]
+                    classname = obj.classname
+                except Exception as e:
+                    if verbose:
+                        tqdm.tqdm.write(f"Warning: failed to read '{key}': {e}")
+                    continue
+
+                # Uproot returns classnames like "TH1D", "TH2F", etc.
+                if classname.startswith("TH2") and load2D_hist:
+                    try:
+                        contents = obj.values()
+                        errors = obj.errors()
+                        x_edges = obj.axes[0].edges()
+                        y_edges = obj.axes[1].edges()
+                        
+                        if optimize_skip_empty and np.all(contents == 0):
+                            # if verbose:
+                            #     tqdm.tqdm.write(f"Skipping empty 2D histogram '{key}' in file '{fname}' due to optimization.")
+                            continue
+                        
+                        # Safe title extraction
+                        x_title = obj.axes[0].member("fTitle") if hasattr(obj.axes[0], "member") else ""
+                        y_title = obj.axes[1].member("fTitle") if hasattr(obj.axes[1], "member") else ""
+                        
+                        h = NumpyHist2D(
+                            name=key,
+                            title=obj.title,
+                            x_edges=np.array(x_edges, dtype=float),
+                            y_edges=np.array(y_edges, dtype=float),
+                            contents=np.array(contents, dtype=float),
+                            errors=np.array(errors, dtype=float),
+                            entries=obj.member("fEntries", none_if_missing=True),
+                            x_title=x_title,
+                            y_title=y_title,
+                            z_title=""
+                        )
+                        result[fname][key] = h
+                    except Exception as e:
+                        tqdm.tqdm.write(f"Warning: failed to convert 2D histogram '{key}': {e}")
+                        
+                elif classname.startswith("TH1"):
+                    try:
+                        contents = obj.values()
+                        errors = obj.errors()
+                        edges = obj.axes[0].edges()
+                        
+                        # Safe title extraction
+                        x_title = obj.axes[0].member("fTitle") if hasattr(obj.axes[0], "member") else ""
+                        y_title = obj.axes[1].member("fTitle") if len(obj.axes) > 1 and hasattr(obj.axes[1], "member") else ""
+                        
+                        # Further optimize, by checking if the histogram is not empty before converting to numpy wrapper
+                        if optimize_skip_empty and np.all(contents == 0):
+                            # if verbose:
+                            #     tqdm.tqdm.write(f"Skipping empty histogram '{key}' in file '{fname}' due to optimization.")
+                            continue
+                        
+                        h = NumpyHist1D(
+                            name=key,
+                            title=obj.title,
+                            edges=np.array(edges, dtype=float),
+                            contents=np.array(contents, dtype=float),
+                            errors=np.array(errors, dtype=float),
+                            entries=obj.member("fEntries", none_if_missing=True),
+                            x_title=x_title,
+                            y_title=y_title
+                        )
+                        result[fname][key] = h
+                    except Exception as e:
+                        tqdm.tqdm.write(f"Warning: failed to convert histogram '{key}': {e}")
+
+    return result
 
 def rebinning_histogram(hist, rebin_factor: Union[int, tuple, list, np.ndarray]):
     """Rebin a histogram by `rebin_factor`. Returns a clone (new object)."""
@@ -173,7 +328,8 @@ def rebinning_histogram(hist, rebin_factor: Union[int, tuple, list, np.ndarray])
 def apply_weights(hist_dict: Dict[str, Dict[str, Any]],
                   cross_sections: Dict[str, float],
                   target_lumi: float,
-                  all_hist_lists: Optional[List[str]] = None):
+                  all_hist_lists: Optional[List[str]] = None,
+                  verbose: bool = True):
     """Apply per-process weight = xsec * lumi / N_generated (taken from initial histogram).
 
     If `all_hist_lists` is provided it is used by name lookups; otherwise caller's global
@@ -181,6 +337,8 @@ def apply_weights(hist_dict: Dict[str, Dict[str, Any]],
     """
     for proc_name, histograms in hist_dict.items():
         if proc_name not in cross_sections:
+            if verbose:
+                print(f"Warning: process '{proc_name}' not found in cross_sections, skipping weight application.")
             continue
         xsec = cross_sections[proc_name]
 
@@ -207,12 +365,17 @@ def apply_weights(hist_dict: Dict[str, Dict[str, Any]],
         efficiency = passed_events / total_events if total_events > 0 else 0
         total_yield = passed_events * weight
 
-        print(f"Process: {proc_name}, Weight: {weight}, Total Events: {total_events}, "
-              f"XSec: {xsec} pb, Efficiency: {efficiency:.2%}, Total Yield: {total_yield}")
+        if verbose:
+            print(f"Process: {proc_name}, Weight: {weight}, Total Events: {total_events}, "
+                  f"XSec: {xsec} pb, Efficiency: {efficiency:.2%}, Total Yield: {total_yield}")
 
         # scale all histograms for this process
         for hname, hist in histograms.items():
             hist.Scale(weight)
+
+import numpy as np
+import matplotlib.pyplot as plt
+import os
 
 def plot_target_histogram(signal, background, histname,
                           custom_parameters={},
@@ -222,26 +385,36 @@ def plot_target_histogram(signal, background, histname,
                           lumi_label="1 ab$^{-1}$ ($\\sqrt{s} = 240$ GeV)",
                           process_colours=None,
                           process_propernames=None,
+                          show=True,
+                          ax=None,
                           figsize=(10,6)):
     """
     Plot one target histogram `histname` given:
       - signal:    {'signal_file': {'histname': TH1/TH2-like, ...}, ...}
       - background:{'bkg_file':    {'histname': TH1/TH2-like, ...}, ...}
     Produces a stacked background and overlaid signal(s). Handles absent inputs.
-    (This function expects 1D histograms for plotting; 2D histograms should be handled elsewhere.)
     """
 
     custom_title = custom_parameters.get('title', None)
     custom_xlabel = custom_parameters.get('xlabel', None)
     custom_ylabel = custom_parameters.get('ylabel', None)
+    custom_colors = custom_parameters.get('colors', {}) # Process: color
+    custom_linestyles = custom_parameters.get('linestyles', {}) # Process: linestyle
     y_unit = custom_parameters.get('yunit', 'unit')
     yscale = custom_parameters.get('yscale', 'linear')
     xlim = custom_parameters.get('xlim', None)
     ylim = custom_parameters.get('ylim', None)
+    
     if yscale not in ['linear', 'log']:
         raise ValueError(f"Invalid yscale '{yscale}'; must be 'linear' or 'log'.")
 
-    # collect any histogram to extract binning
+    # Start plotting setup
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.get_figure()
+
+    # Collect any histogram to extract binning
     def get_hist_from_dict(d):
         for proc in d.values():
             if histname in proc:
@@ -252,11 +425,11 @@ def plot_target_histogram(signal, background, histname,
     if ref_hist is None:
         raise ValueError(f"No histogram named '{histname}' found in signal or background inputs.")
 
-    # Guard: this drawer expects 1D; skip 2D with a clear message
+    # Guard: this drawer expects 1D
     if hasattr(ref_hist, 'GetNbinsY') and callable(ref_hist.GetNbinsY) and ref_hist.GetNbinsY() > 1 and ref_hist.GetNbinsX() > 1:
-        raise ValueError("plot_target_histogram currently supports 1D histograms only. Please use a 2D-specific plotting routine.")
+        raise ValueError("plot_target_histogram currently supports 1D histograms only.")
 
-    # If none, get the title from histogram title
+    # Metadata extraction
     if custom_title is None:
         custom_title = ref_hist.GetTitle()
     if custom_xlabel is None:
@@ -264,134 +437,105 @@ def plot_target_histogram(signal, background, histname,
     if custom_ylabel is None:
         custom_ylabel = ref_hist.GetYaxis().GetTitle()
 
-    # get bin edges and number of bins
+    # Get bin edges
     xa = ref_hist.GetXaxis()
     nbins = xa.GetNbins()
-    edges = [xa.GetBinLowEdge(i) for i in range(1, nbins+1)]
-    edges.append(xa.GetBinUpEdge(nbins))
-    edges = np.array(edges)
-    
-    # Single bin width (assume single equal width for all bins)
+    edges = np.array([xa.GetBinLowEdge(i) for i in range(1, nbins+1)] + [xa.GetBinUpEdge(nbins)])
     bin_width = int(edges[1] - edges[0])
 
-    # helper to convert hist -> numpy arrays (bin contents and bin errors)
     def hist_to_arrays(h):
         contents = np.array([h.GetBinContent(i) for i in range(1, nbins+1)])
         errors   = np.array([h.GetBinError(i)   for i in range(1, nbins+1)])
         return contents, errors
 
-    # prepare background merged per-process (top-level keys)
+    # Prepare backgrounds
     procs = sorted(background.keys()) if background else []
-    if not procs:
-        procs = []
-
-
     merged_bkg = {}
     merged_bkg_err = {}
     for p in procs:
         proc_hist = background.get(p, {}).get(histname, None)
         if proc_hist is None:
-            merged_bkg[p] = np.zeros(nbins)
-            merged_bkg_err[p] = np.zeros(nbins)
+            merged_bkg[p], merged_bkg_err[p] = np.zeros(nbins), np.zeros(nbins)
         else:
-            c, e = hist_to_arrays(proc_hist)
-            merged_bkg[p] = c
-            merged_bkg_err[p] = e
+            merged_bkg[p], merged_bkg_err[p] = hist_to_arrays(proc_hist)
 
-    proc_counts = {p: merged_bkg[p] for p in procs}
-    sorted_procs = sorted(proc_counts.keys(), key=lambda p: np.sum(proc_counts[p]), reverse=False)
+    sorted_procs = sorted(procs, key=lambda p: np.sum(merged_bkg[p]), reverse=False)
 
-    # default colours/names if not provided
     if process_colours is None:
         cmap = plt.get_cmap("tab20")
         process_colours = {p: cmap(i % 20) for i, p in enumerate(sorted_procs)}
     if process_propernames is None:
         process_propernames = {p: p for p in procs}
+    # Override color
+    for p in procs:
+        if p in custom_colors:
+            process_colours[p] = custom_colors[p]
         
-    # total background error (sum in quadrature)
-    if procs:
-        total_err = np.sqrt(np.sum([merged_bkg_err[p]**2 for p in procs], axis=0))
-    else:
-        total_err = np.zeros(nbins)
+    total_err = np.sqrt(np.sum([merged_bkg_err[p]**2 for p in procs], axis=0)) if procs else np.zeros(nbins)
 
-    # prepare signals (may be multiple top-level keys)
+    # Prepare signals
     sig_procs = sorted(signal.keys()) if signal else []
-    signals = {}
-    for s in sig_procs:
-        sh = signal.get(s, {}).get(histname, None)
-        if sh is None:
-            signals[s] = (np.zeros(nbins), np.zeros(nbins))
-        else:
-            signals[s] = hist_to_arrays(sh)
+    signals = {s: hist_to_arrays(signal[s][histname]) if histname in signal[s] else (np.zeros(nbins), np.zeros(nbins)) for s in sig_procs}
 
-    # start plotting
-    plt.figure(figsize=figsize)
+    # Plot Backgrounds
     baseline = np.zeros(nbins)
-    
     for p in sorted_procs:
         counts = merged_bkg[p]
-        color = process_colours.get(p, None)
-        label = process_propernames.get(p, p)
-        # stairs(values, edges, baseline=baseline) will fill between baseline and values
-        plt.stairs(baseline + counts, edges, baseline=baseline, label=label,
-                   color=color, fill=True)
-        baseline = baseline + counts
+        ax.stairs(baseline + counts, edges, baseline=baseline, 
+                  label=process_propernames.get(p, p),
+                  color=process_colours.get(p), fill=True)
+        baseline += counts
     
-
-    # draw background uncertainty band (hatched)
+    # Background uncertainty band
     if procs:
         upper = baseline + total_err
         lower = baseline - total_err
-        plt.fill_between(edges, np.append(lower, lower[-1]), np.append(upper, upper[-1]),
-                         step='post', facecolor='none', hatch='///', edgecolor='black', linewidth=0,
-                         label="background prefit unc.")
+        ax.fill_between(edges, np.append(lower, lower[-1]), np.append(upper, upper[-1]),
+                         step='post', facecolor='none', hatch='///', edgecolor='black', 
+                         linewidth=0, label="bkgs unc.")
 
-    # draw signal(s) as line (no fill)
+    # Plot Signals
     if sig_procs:
         line_styles = ['-', '--', '-.', ':']
         for i, s in enumerate(sig_procs):
-            counts, errs = signals[s]
-            if np.all(counts == 0):
-                continue
-            linestyle = line_styles[i % len(line_styles)]
-            plt.stairs(counts, edges, label=s, color='black', linewidth=2, linestyle=linestyle)
+            counts, _ = signals[s]
+            used_linestyle = custom_linestyles.get(s, line_styles[i % len(line_styles)])
+            if np.all(counts == 0): continue
+            # ax.stairs(counts, edges, label=s, color='black', 
+            #           linewidth=2, linestyle=line_styles[i % len(line_styles)])
+            color = custom_colors.get(s, 'black')
+            ax.stairs(counts, edges, label=s, color=color,
+                      linewidth=2, linestyle=used_linestyle)
 
-    # if no background but signals exist, ensure baseline 0 and limits auto
-    plt.xlim(edges[0], edges[-1])
-    plt.xlabel(custom_xlabel)
-    plt.ylabel(custom_ylabel + f' / {bin_width} {y_unit}')
-    plt.yscale(yscale)
-    # plt.legend(loc='best', bbox_to_anchor=(0, 0.5, 1, 0.5))
-    # If number of legend entries is large, use multiple columns
-    n_legend_cols = 1
-    n_entries = len(procs) + len(sig_procs) + (1 if procs else 0)  # +1 for uncertainty band
-    if n_entries > 10:
-        n_legend_cols = 2
-    plt.legend(loc='best', ncol=n_legend_cols)
+    # Formatting
+    ax.set_xlim(edges[0], edges[-1])
+    ax.set_xlabel(custom_xlabel)
+    ax.set_ylabel(f"{custom_ylabel} / {bin_width} {y_unit}")
+    ax.set_yscale(yscale)
     
-    if xlim is not None:
-        plt.xlim(xlim)
-    if ylim is not None:
-        plt.ylim(ylim)
+    n_entries = len(procs) + len(sig_procs) + (1 if procs else 0)
+    ax.legend(loc='best', ncol=2 if n_entries > 10 else 1, fontsize=14)
+    
+    if xlim is not None: ax.set_xlim(xlim)
+    if ylim is not None: ax.set_ylim(ylim)
 
-    # CMS-style label
+    # CMS-style label (requires mplhep as 'hep')
     try:
+        import mplhep as hep
         title = custom_title if custom_title is not None else histname
-        hep.cms.label(exp=None, llabel=title, rlabel=lumi_label)
-    except Exception:
-        pass
+        hep.cms.label(exp=None, llabel=title, rlabel=lumi_label, ax=ax)
+    except (ImportError, Exception):
+        if custom_title: ax.set_title(custom_title)
 
     if saveas_pdf:
-        # Ensure output directory exists
         os.makedirs(outdir, exist_ok=True)
         savepath = os.path.join(outdir, f"{save_name}.pdf")
-        # plt.savefig(savepath)
-        # Use bbox_inches='tight' to avoid cutting off labels
-        plt.savefig(savepath, bbox_inches='tight')
+        fig.savefig(savepath, bbox_inches='tight')
         print(f"Saved plot to {savepath}")
 
-    # Show plot instead of saving
-    plt.show()
+    if show: plt.show()
+    
+    return ax
 
 
 def merge_histograms_by_mapping(histogram_dict, mapping_dict):
